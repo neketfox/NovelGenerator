@@ -7,12 +7,20 @@
     <title>NovelGenerator</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script>
-      // Applied before the first paint so a reload does not flash the other theme.
+      // Applied before the first paint so a reload does not flash the other theme or language.
+      // A synchronous XHR against data/user/preferences.json (services/userPreferencesServer.ts)
+      // — the only place this app keeps the setting, per the no-browser-storage rule for this
+      // project — so it must resolve before React mounts, which an async fetch cannot do here.
       (function () {
         try {
-          var stored = localStorage.getItem('novelGenerator_theme');
-          if (stored === 'light') document.documentElement.classList.add('light');
-        } catch (error) { /* private mode: the dark default is fine */ }
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', '/api/preferences', false); // synchronous: pre-paint only, local dev server
+          xhr.send(null);
+          var prefs = xhr.status === 200 ? JSON.parse(xhr.responseText) : {};
+          window.__studioPrefs__ = prefs;
+          if (prefs.theme === 'light') document.documentElement.classList.add('light');
+          if (prefs.theme === 'autumn') document.documentElement.classList.add('autumn');
+        } catch (error) { /* dev server not up yet: dark theme and browser language are the defaults */ }
       })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -105,6 +113,18 @@
         --z-900: 244 244 245; --z-950: 250 250 250;
         color-scheme: light;
       }
+
+      /* Cozy Autumn: the same dark zinc structure as the default theme, with the indigo accent
+         (Studio buttons, links, active tabs) swapped for warm terracotta/ochre. Overridden per
+         Tailwind utility class rather than by re-theming every component, since the accent is
+         used as literal classes (bg-indigo-600 etc.) throughout the Studio UI. */
+      html.autumn .bg-indigo-600 { background-color: rgb(154 68 30) !important; }
+      html.autumn .hover\:bg-indigo-500:hover { background-color: rgb(180 83 47) !important; }
+      html.autumn .text-indigo-400 { color: rgb(214 158 98) !important; }
+      html.autumn .hover\:text-indigo-300:hover,
+      html.autumn .hover\:text-indigo-400:hover { color: rgb(230 184 130) !important; }
+      html.autumn .border-indigo-500 { border-color: rgb(154 68 30) !important; }
+      html.autumn .hover\:border-indigo-500:hover { border-color: rgb(180 83 47) !important; }
       html, body, #root {
         height: 100%;
         min-height: 100%;

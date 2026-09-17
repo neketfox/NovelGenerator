@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useI18n } from '../i18n';
 import { GenerationStep, ChapterGenerationStage, ChapterData, AgentLogEntry } from '../types';
 import ChapterChecks from './ChapterChecks';
 import { measureTexture } from '../utils/novel/analytics';
@@ -48,6 +49,7 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
   isLoading = false,
   onResumeGeneration,
 }) => {
+  const { t } = useI18n();
   // Track selected chapter for viewing (defaults to active processing chapter)
   const [selectedChapterIdx, setSelectedChapterIdx] = useState<number>(0);
   const [showOutline, setShowOutline] = useState<boolean>(false);
@@ -68,8 +70,10 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
   // heading adds its own, so the number never prints twice.
   const storedTitle = (activeChapter?.title || '').trim();
   const titleBody = storedTitle.replace(/^chapter\s+\d+\s*:?\s*/i, '').trim();
-  const activeTitle = titleBody || (activeChapterNum === currentChapterProcessing ? 'Generating...' : '');
-  const proseHeading = activeTitle ? `Chapter ${activeChapterNum}: ${activeTitle}` : `Chapter ${activeChapterNum}`;
+  const activeTitle = titleBody || (activeChapterNum === currentChapterProcessing ? t('wizard.threeZone.generatingEllipsis') : '');
+  const proseHeading = activeTitle
+    ? t('wizard.threeZone.chapterHeadingWithTitle', { num: activeChapterNum, title: activeTitle })
+    : t('wizard.threeZone.chapterHeadingNoTitle', { num: activeChapterNum });
   const activeContent = activeChapter?.content || '';
   // Measured live from the shown text: stored texture (when present) wins,
   // otherwise the bar computes over whatever prose is on screen.
@@ -121,13 +125,13 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
           {isLoading && (
             <div className="flex items-center gap-2 text-zinc-400 text-xs">
               <LoadingSpinner className="!my-0 !h-3.5 !w-3.5" />
-              <span>Generating</span>
+              <span>{t('wizard.threeZone.generating')}</span>
               <RunClock agentLogs={agentLogs} isLoading={isLoading} />
             </div>
           )}
           {isResumable && !isLoading && onResumeGeneration && (
             <Button onClick={onResumeGeneration} variant="primary" className="text-xs py-1 px-2.5">
-              Resume Generation
+              {t('wizard.threeZone.resumeGeneration')}
             </Button>
           )}
           <ThemeToggle />
@@ -137,10 +141,10 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
             <button
               type="button"
               onClick={onReset}
-              title="Wipe all temporary generation state and start from clean slate"
+              title={t('wizard.threeZone.cleanSlateTitle')}
               className="h-7 text-xs px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300 rounded transition-colors"
             >
-              Clean Slate
+              {t('wizard.threeZone.cleanSlate')}
             </button>
           )}
         </div>
@@ -157,9 +161,9 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
           className="lg:col-span-2 flex flex-col h-full min-h-0 pr-4 text-left overflow-hidden"
         >
           <div className="shrink-0 flex items-baseline justify-between pb-2">
-            <h3 className="text-xs font-semibold uppercase text-zinc-500">Chapters</h3>
+            <h3 className="text-xs font-semibold uppercase text-zinc-500">{t('wizard.threeZone.chaptersHeading')}</h3>
             <span className="text-xs text-zinc-500">
-              {currentChapterProcessing > 0 ? `Ch ${currentChapterProcessing} of ${totalChaptersToProcess || generatedChapters.length}` : 'Preparing'}
+              {currentChapterProcessing > 0 ? t('wizard.threeZone.chapterProgress', { current: currentChapterProcessing, total: totalChaptersToProcess || generatedChapters.length }) : t('wizard.threeZone.preparing')}
             </span>
           </div>
 
@@ -187,7 +191,7 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
                     <div className="flex items-center gap-2 truncate pr-2">
                       <span className="font-mono text-zinc-500 w-5">#{chapterNum}</span>
                       <span className="truncate">
-                        {chapter?.title || (isProcessing ? 'Generating...' : `Chapter ${chapterNum}`)}
+                        {chapter?.title || (isProcessing ? t('wizard.threeZone.generatingEllipsis') : t('wizard.threeZone.chapterNum', { num: chapterNum }))}
                       </span>
                     </div>
 
@@ -195,12 +199,12 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
                       {isProcessing ? (
                         <span className="flex items-center gap-1 text-xs text-zinc-300">
                           <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-ping" />
-                          Live
+                          {t('wizard.threeZone.live')}
                         </span>
                       ) : isCompleted ? (
-                        <span className="text-zinc-400 text-xs">Accepted</span>
+                        <span className="text-zinc-400 text-xs">{t('wizard.threeZone.accepted')}</span>
                       ) : (
-                        <span className="text-zinc-600 text-xs">{chapter?.content ? 'Needs review' : 'Pending'}</span>
+                        <span className="text-zinc-600 text-xs">{chapter?.content ? t('wizard.threeZone.needsReview') : t('wizard.threeZone.pending')}</span>
                       )}
                     </div>
                   </button>
@@ -213,12 +217,12 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
           <div className="flex-1 min-h-0 border-t border-zinc-800 pt-2 flex flex-col gap-1.5 overflow-hidden">
             <div className="shrink-0 flex items-center justify-between">
               <span className="text-xs font-semibold uppercase text-zinc-500">
-                Plan · Ch {activeChapterNum}
+                {t('wizard.threeZone.planHeading', { num: activeChapterNum })}
               </span>
             </div>
             <div className="flex-1 min-h-0 pr-1 text-xs text-zinc-400 overflow-y-auto">
               <PlanView
-                content={activeChapter?.plan || currentChapterPlan || 'Drafting scene breakdown and pacing objectives...'}
+                content={activeChapter?.plan || currentChapterPlan || t('wizard.threeZone.planPlaceholder')}
               />
             </div>
           </div>
@@ -231,8 +235,8 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
               className="shrink-0 flex items-center justify-between text-xs font-semibold uppercase text-zinc-500 hover:text-zinc-300 transition-colors"
             >
               <div className="flex items-center gap-1.5">
-                <span>Story Outline</span>
-                <span className="text-xs text-zinc-500 lowercase">({currentStoryOutline ? `${currentStoryOutline.length} chars` : 'empty'})</span>
+                <span>{t('wizard.threeZone.storyOutline')}</span>
+                <span className="text-xs text-zinc-500 lowercase">({currentStoryOutline ? t('wizard.threeZone.outlineChars', { count: currentStoryOutline.length }) : t('wizard.threeZone.outlineEmpty')})</span>
               </div>
               <span className="text-xs">{showOutline ? '[-]' : '[+]'}</span>
             </button>
@@ -240,7 +244,7 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
             {showOutline && (
               <div className="flex-1 min-h-0 pr-1 text-xs text-zinc-400 overflow-y-auto animate-fade-in">
                 <MarkdownView
-                  content={currentStoryOutline ? currentStoryOutline.replace(/\r\n/g, '\n').replace(/\n[ \t]*\n[ \t]*\n+/g, '\n\n') : 'No outline generated yet.'}
+                  content={currentStoryOutline ? currentStoryOutline.replace(/\r\n/g, '\n').replace(/\n[ \t]*\n[ \t]*\n+/g, '\n\n') : t('wizard.threeZone.noOutlineYet')}
                   className="text-xs compact-outline"
                 />
               </div>
@@ -257,11 +261,11 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
         >
           {texture && (
             <div className="shrink-0 px-6 pt-3 text-xs text-zinc-500 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-zinc-800 pb-2">
-              <span className="uppercase tracking-wide text-zinc-600">Measured</span>
-              <span>dialogue <span className="tabular-nums text-zinc-400">{Math.round(texture.dialogueShare * 100)}%</span></span>
-              <span>median paragraph <span className="tabular-nums text-zinc-400">{texture.medianParagraphWords}w</span></span>
-              <span>comparisons/1k <span className="tabular-nums text-zinc-400">{texture.similesPer1000.toFixed(1)}</span></span>
-              <span>lines with a beat <span className="tabular-nums text-zinc-400">{Math.round(texture.taggedSpeechShare * 100)}%</span></span>
+              <span className="uppercase tracking-wide text-zinc-600">{t('wizard.threeZone.measured')}</span>
+              <span>{t('wizard.threeZone.dialogue')} <span className="tabular-nums text-zinc-400">{Math.round(texture.dialogueShare * 100)}%</span></span>
+              <span>{t('wizard.threeZone.medianParagraph')} <span className="tabular-nums text-zinc-400">{texture.medianParagraphWords}w</span></span>
+              <span>{t('wizard.threeZone.comparisonsPer1k')} <span className="tabular-nums text-zinc-400">{texture.similesPer1000.toFixed(1)}</span></span>
+              <span>{t('wizard.threeZone.linesWithBeat')} <span className="tabular-nums text-zinc-400">{Math.round(texture.taggedSpeechShare * 100)}%</span></span>
               {texture.findings.length > 0 && (
                 <span className="basis-full text-zinc-400" title={texture.findings.map(finding => finding.description).join('\n')}>
                   {texture.findings.map(finding => finding.id).join(' · ')}
@@ -277,7 +281,7 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
             />
           ) : (
             <div className="pt-8 px-6 font-serif text-prose max-w-[62ch] mx-auto text-zinc-500">
-              <p>The story plan is being prepared. Each completed scene appears here before chapter review.</p>
+              <p>{t('wizard.threeZone.proseWaiting')}</p>
               <p className="text-xs mt-4">{currentStep}</p>
             </div>
           )}
@@ -294,25 +298,25 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
             )}
             <div className="border-t border-zinc-800 mt-2 pt-2 flex flex-col min-h-0 flex-1 overflow-hidden">
               <div className="shrink-0 flex items-baseline justify-between pb-2">
-                <h3 className="text-xs font-semibold uppercase text-zinc-500">Agent Inspector</h3>
+                <h3 className="text-xs font-semibold uppercase text-zinc-500">{t('wizard.threeZone.agentInspector')}</h3>
                 <span className="text-xs text-zinc-500">
-                  {agentLogs.length} events
+                  {t('wizard.threeZone.eventsCount', { count: agentLogs.length })}
                 </span>
               </div>
 
               {/* Quick Agent Status Telemetry */}
               <div className="shrink-0 grid grid-cols-2 gap-2 pt-2">
                 <div className="py-1">
-                  <div className="text-xs font-semibold uppercase text-zinc-500">Pipeline</div>
+                  <div className="text-xs font-semibold uppercase text-zinc-500">{t('wizard.threeZone.pipeline')}</div>
                   <div className="text-xs text-zinc-300 mt-0.5 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
-                    Active
+                    {t('wizard.threeZone.active')}
                   </div>
                 </div>
                 <div className="py-1">
-                  <div className="text-xs font-semibold uppercase text-zinc-500">Target</div>
+                  <div className="text-xs font-semibold uppercase text-zinc-500">{t('wizard.threeZone.target')}</div>
                   <div className="text-xs text-zinc-300 mt-0.5 truncate">
-                    Ch #{currentChapterProcessing || 1}
+                    {t('wizard.threeZone.chapterHash', { num: currentChapterProcessing || 1 })}
                   </div>
                 </div>
               </div>
@@ -324,7 +328,7 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
                 </div>
               ) : (
                 <div className="pt-3 text-zinc-500 text-xs">
-                  <span>Awaiting agent telemetry...</span>
+                  <span>{t('wizard.threeZone.awaitingTelemetry')}</span>
                 </div>
               )}
             </div>

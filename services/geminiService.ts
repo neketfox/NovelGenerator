@@ -3,16 +3,7 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GEMINI_MODEL_NAME } from '../constants';
 import { withResilienceTracking, apiResilienceManager } from '../utils/apiResilienceUtils';
-
-const API_KEY = process.env.API_KEY;
-
-let ai: GoogleGenerativeAI | null = null;
-
-if (API_KEY) {
-  ai = new GoogleGenerativeAI(API_KEY);
-} else {
-  console.error("CRITICAL: API_KEY environment variable is not set. Gemini API calls will fail.");
-}
+import { withApiKeyRotation, trackUsageFromResponse, GEMINI_REQUEST_OPTIONS } from './geminiKeyPool';
 
 const handleApiError = (error: unknown): Error => {
   console.error("❌ Error calling Gemini API:", error);
@@ -214,10 +205,6 @@ export async function generateGeminiText(
   jsonOnly = false,
   modelName?: string
 ): Promise<string> {
-  if (!ai) {
-    throw new Error("Gemini API client is not initialized. API_KEY might be missing.");
-  }
-
   // Use more retries for complex schema requests
   const maxRetries = responseSchema ? 7 : 5;
   const baseDelay = responseSchema ? 3000 : 2000;
@@ -253,15 +240,19 @@ export async function generateGeminiText(
         : NO_THINKING_DIRECTIVE;
 
       const resolvedModel = modelName?.trim() || GEMINI_MODEL_NAME;
-      const model = ai!.getGenerativeModel({
-        model: resolvedModel,
-        generationConfig,
-        systemInstruction: finalSystemInstruction
-      });
-
       console.log(`🔄 Sending request to Gemini API (model: ${resolvedModel})...`);
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
+      // Rotates through the user's configured key pool on 429/403 (services/geminiKeyPool.ts);
+      // falls back to the process-level API_KEY when no pool is configured.
+      const response = await withApiKeyRotation(async (apiKey) => {
+        const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
+          model: resolvedModel,
+          generationConfig,
+          systemInstruction: finalSystemInstruction
+        }, GEMINI_REQUEST_OPTIONS);
+        const result = await model.generateContent(prompt);
+        return result.response;
+      });
+      trackUsageFromResponse(response as { usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } });
       const rawText = response.text();
       const text = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
       // Why an answer is unusable matters more than that it is. A truncated JSON object and a model
@@ -299,10 +290,6 @@ export async function generateGeminiTextStream(
   responseSchema?: object,
   maxOutputTokens?: number,
 ): Promise<string> {
-  if (!ai) {
-    throw new Error("Gemini API client is not initialized. API_KEY might be missing.");
-  }
-
   const NO_THINKING_DIRECTIVE = "Do not output thinking, inner monologue, reasoning steps, or <think> tags. Provide direct final output only.";
 
   return retryWithBackoff(async () => {
@@ -331,14 +318,6 @@ export async function generateGeminiTextStream(
       const finalSystemInstruction = systemInstruction 
         ? `${systemInstruction}\n\n${NO_THINKING_DIRECTIVE}` 
         : NO_THINKING_DIRECTIVE;
-
-      const model = ai!.getGenerativeModel({
-        model: modelName?.trim() || GEMINI_MODEL_NAME,
-        generationConfig,
-        systemInstruction: finalSystemInstruction
-      });
-
-      const result = await model.generateContentStream(prompt);
 
       let fullText = '';
       let insideThinkTag = false;
@@ -373,12 +352,23 @@ export async function generateGeminiTextStream(
         }
       };
 
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        if (chunkText) {
-          processChunk(chunkText);
+      // Rotates through the user's configured key pool on 429/403 — the initial request that
+      // opens the stream is what fails on a rate limit; once chunks are flowing, retrying would
+      // duplicate output, so rotation only ever replays the not-yet-started call.
+      await withApiKeyRotation(async (apiKey) => {
+        const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
+          model: modelName?.trim() || GEMINI_MODEL_NAME,
+          generationConfig,
+          systemInstruction: finalSystemInstruction
+        }, GEMINI_REQUEST_OPTIONS);
+        const result = await model.generateContentStream(prompt);
+        for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          if (chunkText) {
+            processChunk(chunkText);
+          }
         }
-      }
+      });
       return fullText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     } catch (error) {
       throw handleApiError(error);

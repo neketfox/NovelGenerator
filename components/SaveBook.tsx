@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useI18n } from '../i18n';
 import AuthorPromptModal from './AuthorPromptModal';
 import { exportAsEpub, exportAsJSON, exportAsPdf, exportAsText, exportAsMarkdown, extractBookTitle, sanitizeFilename } from '../utils/exportUtils';
 
 export default function SaveBook({ content, metadata = {}, draft = false }: { content: string; metadata?: Record<string, unknown>; draft?: boolean }) {
+  const { t } = useI18n();
   const [format, setFormat] = useState('epub');
   const [authorOpen, setAuthorOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -22,11 +24,11 @@ export default function SaveBook({ content, metadata = {}, draft = false }: { co
   };
   return <div className="shrink-0">
     <div className="flex flex-wrap items-center gap-2">
-      <select aria-label="Save format" value={format} onChange={event => setFormat(event.target.value)} disabled={busy} className="bg-zinc-900 border border-zinc-700 rounded h-7 px-3 py-1 text-xs text-zinc-200">
-        <option value="epub">EPUB</option><option value="pdf">PDF</option><option value="txt">TXT</option><option value="md">Markdown</option><option value="report">Report (JSON)</option>
+      <select aria-label={t('wizard.saveBook.formatLabel')} value={format} onChange={event => setFormat(event.target.value)} disabled={busy} className="bg-zinc-900 border border-zinc-700 rounded h-7 px-3 py-1 text-xs text-zinc-200">
+        <option value="epub">{t('wizard.saveBook.formatEpub')}</option><option value="pdf">{t('wizard.saveBook.formatPdf')}</option><option value="txt">{t('wizard.saveBook.formatTxt')}</option><option value="md">{t('wizard.saveBook.formatMarkdown')}</option><option value="report">{t('wizard.saveBook.formatReport')}</option>
       </select>
-      <button type="button" onClick={save} disabled={busy || !content.trim()} className="h-7 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-xs text-zinc-100 disabled:opacity-50">{busy ? 'Saving…' : draft ? 'Save draft' : 'Save book'}</button>
-      {draft && <span className="sr-only">Current chapters · not fully reviewed</span>}
+      <button type="button" onClick={save} disabled={busy || !content.trim()} className="h-7 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded text-xs text-zinc-100 disabled:opacity-50">{busy ? t('wizard.saveBook.saving') : draft ? t('wizard.saveBook.saveDraft') : t('wizard.saveBook.saveBook')}</button>
+      {draft && <span className="sr-only">{t('wizard.saveBook.draftNote')}</span>}
     </div>
     {error && <p role="alert" className="mt-2 text-xs text-red-400">{error}</p>}
     <AuthorPromptModal isOpen={authorOpen} defaultAuthor={typeof metadata.author === 'string' ? metadata.author : ''} onCancel={() => setAuthorOpen(false)} onConfirm={async author => {

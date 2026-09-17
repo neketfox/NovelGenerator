@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useI18n } from '../i18n';
 import { bestsellerAdvisory, hookScore, recurrentMotifs, rhythmDrift, uniqueNgramRatio } from '../utils/novel/analytics';
 
 /**
@@ -7,6 +8,7 @@ import { bestsellerAdvisory, hookScore, recurrentMotifs, rhythmDrift, uniqueNgra
  * Advisory only — nothing here judges.
  */
 export default function ChapterChecks({ content, chapterNum }: { content: string; chapterNum: number }) {
+  const { t } = useI18n();
   const rows = useMemo(() => {
     if (!content.trim()) return undefined;
     const motifs = recurrentMotifs(content);
@@ -14,24 +16,26 @@ export default function ChapterChecks({ content, chapterNum }: { content: string
     const hook = hookScore(content);
     const advisory = bestsellerAdvisory(content).map(finding => finding.id);
     return [
-      { label: 'Originality', value: `${Math.round(uniqueNgramRatio(content) * 100)}%` },
+      { label: t('wizard.chapterChecks.originality'), value: `${Math.round(uniqueNgramRatio(content) * 100)}%` },
       {
-        label: 'Motifs',
-        value: motifs.length ? `${motifs.length} × “${motifs[0].phrase.slice(0, 32)}”` : 'none circling',
+        label: t('wizard.chapterChecks.motifs'),
+        value: motifs.length ? t('wizard.chapterChecks.motifsFound', { count: motifs.length, phrase: motifs[0].phrase.slice(0, 32) }) : t('wizard.chapterChecks.noneCircling'),
       },
       {
-        label: 'Rhythm',
-        value: rhythm.drifted ? `drifted ${rhythm.firstMedian}→${rhythm.lastMedian}w` : `held ~${rhythm.lastMedian}w`,
+        label: t('wizard.chapterChecks.rhythm'),
+        value: rhythm.drifted
+          ? t('wizard.chapterChecks.drifted', { from: rhythm.firstMedian, to: rhythm.lastMedian })
+          : t('wizard.chapterChecks.held', { value: rhythm.lastMedian }),
       },
-      { label: 'Hook', value: `${hook}/10${advisory.length ? ` · ${advisory.join(', ')}` : ''}` },
+      { label: t('wizard.chapterChecks.hook'), value: `${hook}/10${advisory.length ? ` · ${advisory.join(', ')}` : ''}` },
     ];
-  }, [content]);
+  }, [content, t]);
 
   return (
     <div data-testid="zone-checks" className="shrink-0 flex flex-col pb-5">
       <div className="shrink-0 flex items-baseline justify-between pb-2">
-        <h3 className="text-xs font-semibold uppercase text-zinc-500">Checks</h3>
-        <span className="text-xs text-zinc-500">Ch #{chapterNum}</span>
+        <h3 className="text-xs font-semibold uppercase text-zinc-500">{t('wizard.chapterChecks.heading')}</h3>
+        <span className="text-xs text-zinc-500">{t('wizard.chapterChecks.chapterHash', { num: chapterNum })}</span>
       </div>
       {rows ? (
         <div className="pt-2 pr-1 flex flex-col gap-3">
@@ -44,7 +48,7 @@ export default function ChapterChecks({ content, chapterNum }: { content: string
         </div>
       ) : (
         <div className="pt-3 text-zinc-500 text-xs">
-          <span>Awaiting prose...</span>
+          <span>{t('wizard.chapterChecks.awaitingProse')}</span>
         </div>
       )}
     </div>

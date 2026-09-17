@@ -5,6 +5,11 @@ import ThreeZoneGenerationView from '../components/ThreeZoneGenerationView';
 import { elapsedLabel } from '../components/RunClock';
 import { bookTitle, splitError, stepName } from '../hooks/useBookGenerator';
 import { GenerationStep } from '../types';
+import { I18nProvider } from '../i18n';
+
+// The wizard components read translations via useI18n(), which requires an I18nProvider
+// ancestor; the app always renders one via AppRouter, so tests provide the same wrapper.
+const renderWithI18n = (node: React.ReactElement) => renderToStaticMarkup(<I18nProvider>{node}</I18nProvider>);
 
 describe('ThreeZoneGenerationView', () => {
   const mockChapters = [
@@ -36,7 +41,7 @@ describe('ThreeZoneGenerationView', () => {
   ];
 
   it('renders all 3 distinct zones for the generation workflow', () => {
-    const html = renderToStaticMarkup(
+    const html = renderWithI18n(
       <ThreeZoneGenerationView
         currentStep={GenerationStep.GeneratingChapters}
         currentChapterProcessing={2}
@@ -70,7 +75,7 @@ describe('ThreeZoneGenerationView', () => {
     // prefix its own "Chapter N:" on top of one.
     const bare = [{ title: 'Chapter 1', content: 'Ann climbed while the storm took the rail.' }];
     const named = [{ title: 'Chapter 1: The Awakening', content: 'Ann climbed while the storm took the rail.' }];
-    const render = (chapters: { title: string; content: string }[]) => renderToStaticMarkup(
+    const render = (chapters: { title: string; content: string }[]) => renderWithI18n(
       <ThreeZoneGenerationView
         currentStep={GenerationStep.GeneratingChapters}
         currentChapterProcessing={1}
@@ -94,7 +99,7 @@ describe('ThreeZoneGenerationView', () => {
     // The panel shows the chapter's own plan; the book blueprint is a different document.
     const chapters = [{ ...mockChapters[0], plan: longPlan }, ...mockChapters.slice(1)];
 
-    const html = renderToStaticMarkup(
+    const html = renderWithI18n(
       <ThreeZoneGenerationView
         currentStep={GenerationStep.GeneratingChapters}
         currentChapterProcessing={1}
@@ -118,7 +123,7 @@ describe('ThreeZoneGenerationView', () => {
     });
     const chapters = [{ ...mockChapters[0], plan }, ...mockChapters.slice(1)];
 
-    const html = renderToStaticMarkup(
+    const html = renderWithI18n(
       <ThreeZoneGenerationView
         currentStep={GenerationStep.GeneratingChapters}
         currentChapterProcessing={1}
@@ -145,7 +150,7 @@ describe('ThreeZoneGenerationView', () => {
     ]);
     const chapters = [{ ...mockChapters[0], plan }, ...mockChapters.slice(1)];
 
-    const html = renderToStaticMarkup(
+    const html = renderWithI18n(
       <ThreeZoneGenerationView
         currentStep={GenerationStep.GeneratingChapters}
         currentChapterProcessing={1}
@@ -175,7 +180,7 @@ describe('ThreeZoneGenerationView', () => {
         findings: [{ id: 'speech-tag-bloat', description: '100% of spoken lines arrive with an attached gesture.' }],
       },
     }];
-    const html = renderToStaticMarkup(
+    const html = renderWithI18n(
       <ThreeZoneGenerationView
         currentStep={GenerationStep.GeneratingChapters}
         currentChapterProcessing={1}

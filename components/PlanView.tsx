@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
+import { useI18n } from '../i18n';
 import { MarkdownView } from './common/MarkdownView';
 
-const LABELS: Record<string, string> = {
-  title: 'Title', summary: 'Summary', sceneBreakdown: 'Scenes',
-  characterDevelopmentFocus: 'Character focus', plotAdvancement: 'Plot',
-  timelineIndicators: 'Timeline', emotionalToneTension: 'Tone',
-  connectionToNextChapter: 'Leads to', openingHook: 'Opens with', chapterEnding: 'Ends with',
-  moralDilemma: 'Dilemma', consequencesOfChoices: 'Consequences', rhythmPacing: 'Pacing',
-  tensionLevel: 'Tension', targetWordCount: 'Target words',
-  centralConflict: 'Central conflict', protagonistChange: 'Protagonist change', endingPayoff: 'Ending payoff',
-};
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
+const buildLabels = (t: Translate): Record<string, string> => ({
+  title: t('wizard.planView.labelTitle'), summary: t('wizard.planView.labelSummary'), sceneBreakdown: t('wizard.planView.labelSceneBreakdown'),
+  characterDevelopmentFocus: t('wizard.planView.labelCharacterFocus'), plotAdvancement: t('wizard.planView.labelPlotAdvancement'),
+  timelineIndicators: t('wizard.planView.labelTimeline'), emotionalToneTension: t('wizard.planView.labelTone'),
+  connectionToNextChapter: t('wizard.planView.labelLeadsTo'), openingHook: t('wizard.planView.labelOpensWith'), chapterEnding: t('wizard.planView.labelEndsWith'),
+  moralDilemma: t('wizard.planView.labelDilemma'), consequencesOfChoices: t('wizard.planView.labelConsequences'), rhythmPacing: t('wizard.planView.labelPacing'),
+  tensionLevel: t('wizard.planView.labelTension'), targetWordCount: t('wizard.planView.labelTargetWords'),
+  centralConflict: t('wizard.planView.labelCentralConflict'), protagonistChange: t('wizard.planView.labelProtagonistChange'), endingPayoff: t('wizard.planView.labelEndingPayoff'),
+});
 
 /** What the author checks while a chapter is being written; the rest is available on request. */
 const DIGEST = ['summary', 'sceneBreakdown', 'chapterEnding'];
@@ -27,8 +30,8 @@ const readable = (value: unknown): string | undefined => {
 };
 
 /** snake_case and camelCase keys become plain labels; known acronyms stay uppercase. */
-const prettyLabel = (key: string): string => {
-  if (LABELS[key]) return LABELS[key];
+const prettyLabel = (key: string, labels: Record<string, string>): string => {
+  if (labels[key]) return labels[key];
   if (key === 'pov_id') return 'POV';
   if (key === 'event_ids') return 'Events';
   return key
@@ -46,10 +49,10 @@ const prettyLabel = (key: string): string => {
 
 type Entry = { label: string; value: string };
 
-const recordEntries = (record: Record<string, unknown>, order: string[] = []): Entry[] => {
+const recordEntries = (record: Record<string, unknown>, labels: Record<string, string>, order: string[] = []): Entry[] => {
   const keys = [...order.filter(key => key in record), ...Object.keys(record).filter(key => !order.includes(key))];
   return keys
-    .map(key => ({ label: prettyLabel(key), value: readable(record[key]) || '' }))
+    .map(key => ({ label: prettyLabel(key, labels), value: readable(record[key]) || '' }))
     .filter(entry => Boolean(entry.value));
 };
 
@@ -61,6 +64,8 @@ const CHAPTER_ORDER = ['function', 'main_change', 'setup_or_payoff', 'dependenci
  * author and their own chapter, and the full record buries the few fields worth glancing at.
  */
 export default function PlanView({ content, className = '' }: { content: string; className?: string }) {
+  const { t } = useI18n();
+  const labels = buildLabels(t);
   const [expanded, setExpanded] = useState(false);
 
   let parsed: Record<string, unknown> | undefined;
@@ -81,11 +86,11 @@ export default function PlanView({ content, className = '' }: { content: string;
       <div className={`${className} space-y-4`}>
         {listed.map((record, index) => {
           const chapter = readable(record.chapter);
-          const entries = recordEntries(record, CHAPTER_ORDER).filter(entry => entry.label !== 'Chapter');
+          const entries = recordEntries(record, labels, CHAPTER_ORDER).filter(entry => entry.label !== 'Chapter');
           if (!entries.length) return null;
           return (
             <section key={chapter || String(index)}>
-              {chapter && <h4 className="text-xs font-semibold text-zinc-200">Chapter {chapter}</h4>}
+              {chapter && <h4 className="text-xs font-semibold text-zinc-200">{t('wizard.planView.chapterHeading', { num: chapter })}</h4>}
               <dl className="mt-2 space-y-3">
                 {entries.map(entry => (
                   <div key={entry.label}>
@@ -104,7 +109,7 @@ export default function PlanView({ content, className = '' }: { content: string;
   if (!parsed) return <MarkdownView content={content} className={className} />;
 
   const all = Object.entries(parsed)
-    .map(([key, value]) => ({ key, label: prettyLabel(key), value: readable(value) }))
+    .map(([key, value]) => ({ key, label: prettyLabel(key, labels), value: readable(value) }))
     .filter((entry): entry is { key: string; label: string; value: string } => Boolean(entry.value));
 
   if (!all.length) return <MarkdownView content={content} className={className} />;
@@ -140,14 +145,14 @@ export default function PlanView({ content, className = '' }: { content: string;
       </dl>
       {scenes.length > 0 && (
         <div className="mt-3 space-y-2">
-          <div className="text-xs font-semibold uppercase text-zinc-500">Scenes</div>
+          <div className="text-xs font-semibold uppercase text-zinc-500">{t('wizard.planView.scenesHeading')}</div>
           {scenes.map((scene, index) => {
             const rows = [
-              ['Shape', sceneText(scene, 'sceneShape')],
-              ['Staging', sceneText(scene, 'staging')],
-              ['Objective', sceneText(scene, 'objective')],
-              ['Conflict', sceneText(scene, 'conflict')],
-              ['Carried by', sceneText(scene, 'conflictCarriedBy')],
+              [t('wizard.planView.sceneShape'), sceneText(scene, 'sceneShape')],
+              [t('wizard.planView.sceneStaging'), sceneText(scene, 'staging')],
+              [t('wizard.planView.sceneObjective'), sceneText(scene, 'objective')],
+              [t('wizard.planView.sceneConflict'), sceneText(scene, 'conflict')],
+              [t('wizard.planView.sceneCarriedBy'), sceneText(scene, 'conflictCarriedBy')],
             ].filter((row): row is [string, string] => Boolean(row[1]));
             return (
               <div key={sceneText(scene, 'sceneId') || String(index)} className="border border-zinc-800 rounded p-2">
@@ -172,7 +177,7 @@ export default function PlanView({ content, className = '' }: { content: string;
           onClick={() => setExpanded(true)}
           className="mt-3 text-xs uppercase text-zinc-500 hover:text-zinc-300 transition-colors"
         >
-          Show full plan ({hidden} more)
+          {t('wizard.planView.showFullPlan', { hidden })}
         </button>
       )}
       {expanded && (
@@ -181,7 +186,7 @@ export default function PlanView({ content, className = '' }: { content: string;
           onClick={() => setExpanded(false)}
           className="mt-3 text-xs uppercase text-zinc-500 hover:text-zinc-300 transition-colors"
         >
-          Show less
+          {t('wizard.planView.showLess')}
         </button>
       )}
     </div>

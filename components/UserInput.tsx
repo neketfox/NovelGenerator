@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useI18n } from '../i18n';
 import { Button } from './common/Button';
 import { TextArea } from './common/TextArea';
 import { Input } from './common/Input';
@@ -34,10 +35,31 @@ const UserInput: React.FC<UserInputProps> = ({
   onSubmit,
   isLoading,
 }) => {
-  const [providerConfig, setProviderConfig] = useState<LLMProviderConfig>(() => getStoredProviderConfig());
+  const { t } = useI18n();
+  // Collapsed by default: this is an advanced/rarely-changed section, and the story premise
+  // below it is what a new session actually starts with.
+  const [providerSectionOpen, setProviderSectionOpen] = useState(false);
+  // Whether the genre field shows the preset dropdown or a free-text box: starts in text mode
+  // whenever the incoming value isn't one of the known preset keys (e.g. a saved custom genre).
+  const [genreIsCustom, setGenreIsCustom] = useState(() => !(genre in GENRE_CONFIGS));
+  // The model fields show gemini-3.6-flash explicitly rather than leaving them blank with a
+  // placeholder — same resolved model either way (an absent geminiModel already means "use the
+  // default"), just visible instead of implied.
+  const [providerConfig, setProviderConfig] = useState<LLMProviderConfig>(() => {
+    const stored = getStoredProviderConfig();
+    return { ...stored, geminiModel: stored.geminiModel ?? GEMINI_MODEL_NAME };
+  });
   const [validator, setValidator] = useState<LLMProviderConfig & { enabled: boolean }>(() => {
     const stored = getStoredValidatorConfig();
-    return { ...(stored || getStoredProviderConfig()), think: stored?.think ?? false, enabled: Boolean(stored) };
+    // Defaults to on: a separate editor model is the recommended configuration, and the
+    // storage layer has no way to tell "never touched" apart from "explicitly turned off"
+    // (both persist as no record) — so this session starts from the recommended default.
+    return {
+      ...(stored || getStoredProviderConfig()),
+      geminiModel: stored?.geminiModel ?? GEMINI_MODEL_NAME,
+      think: stored?.think ?? false,
+      enabled: true,
+    };
   });
 
   const updateValidator = (change: Partial<LLMProviderConfig & { enabled: boolean }>) => {
@@ -56,7 +78,7 @@ const UserInput: React.FC<UserInputProps> = ({
       const models = await fetchOllamaModels(providerConfig.ollamaEndpoint);
       setOllamaModels(models);
       if (models.length > 0) {
-        setFetchStatus({ success: true, message: `Found ${models.length} models in Ollama` });
+        setFetchStatus({ success: true, message: t('wizard.userInput.foundModels', { count: models.length }) });
         if (!models.includes(providerConfig.ollamaModel)) {
           const updated = { ...providerConfig, ollamaModel: models[0] };
           setProviderConfig(updated);
@@ -65,13 +87,13 @@ const UserInput: React.FC<UserInputProps> = ({
       } else {
         setFetchStatus({
           success: false,
-          message: 'Ollama is reachable, but model list is empty. Pull a model via `ollama pull llama3.1`.'
+          message: t('wizard.userInput.emptyModelList')
         });
       }
     } catch (err: any) {
       setFetchStatus({
         success: false,
-        message: err.message || 'Cannot connect to Ollama. Make sure Ollama server is running.'
+        message: err.message || t('wizard.userInput.ollamaConnectError')
       });
     } finally {
       setIsFetchingModels(false);
@@ -85,20 +107,20 @@ const UserInput: React.FC<UserInputProps> = ({
       const models = await fetchOllamaModels(providerConfig.ollamaEndpoint);
       setOllamaModels(models);
       if (models.length > 0) {
-        setFetchStatus({ success: true, message: `Found ${models.length} models in Ollama` });
+        setFetchStatus({ success: true, message: t('wizard.userInput.foundModels', { count: models.length }) });
         if (!models.includes(validator.ollamaModel)) {
           updateValidator({ ollamaModel: models[0] });
         }
       } else {
         setFetchStatus({
           success: false,
-          message: 'Ollama is reachable, but model list is empty. Pull a model via `ollama pull llama3.1`.'
+          message: t('wizard.userInput.emptyModelList')
         });
       }
     } catch (err: any) {
       setFetchStatus({
         success: false,
-        message: err.message || 'Cannot connect to Ollama. Make sure Ollama server is running.'
+        message: err.message || t('wizard.userInput.ollamaConnectError')
       });
     } finally {
       setIsFetchingModels(false);
@@ -110,23 +132,33 @@ const UserInput: React.FC<UserInputProps> = ({
     if (numChapters >= MIN_CHAPTERS) {
       onSubmit();
     } else {
-      alert(`Please enter at least ${MIN_CHAPTERS} chapters.`);
+      alert(t('wizard.userInput.minChaptersAlert', { minChapters: MIN_CHAPTERS }));
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* AI Model Provider Section */}
+      {/* AI Model Provider Section — collapsed by default, an advanced/rarely-changed setting */}
       <div className="border border-zinc-800 rounded p-4 md:p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+        <button
+          type="button"
+          onClick={() => setProviderSectionOpen((open) => !open)}
+          className="w-full flex items-center justify-between gap-3 text-left"
+          aria-expanded={providerSectionOpen}
+        >
           <div>
             <h3 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-zinc-400" />
-              <span>AI provider</span>
+              <span>{t('wizard.userInput.aiProviderHeading')}</span>
             </h3>
-            <p className="text-xs text-zinc-500">Choose inference provider: Gemini or Ollama</p>
+            <p className="text-xs text-zinc-500">{t('wizard.userInput.aiProviderDescription')}</p>
           </div>
-          
+          <span className={`text-zinc-500 text-sm transition-transform ${providerSectionOpen ? 'rotate-180' : ''}`}>▾</span>
+        </button>
+
+        {providerSectionOpen && (
+        <>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3 mb-3 mt-3">
           <div className="inline-flex rounded bg-zinc-900 p-1 border border-zinc-800 self-start sm:self-auto">
             <button
               type="button"
@@ -141,7 +173,7 @@ const UserInput: React.FC<UserInputProps> = ({
                   : 'text-zinc-400 hover:text-zinc-300'
               }`}
             >
-              Gemini
+              {t('wizard.userInput.providerGemini')}
             </button>
             <button
               type="button"
@@ -156,7 +188,7 @@ const UserInput: React.FC<UserInputProps> = ({
                   : 'text-zinc-400 hover:text-zinc-300'
               }`}
             >
-              Ollama
+              {t('wizard.userInput.providerOllama')}
             </button>
           </div>
         </div>
@@ -166,7 +198,7 @@ const UserInput: React.FC<UserInputProps> = ({
           <div className="mt-4 pt-3 border-t border-zinc-800 space-y-3 animate-fade-in">
             <div>
               <label className="block text-sm font-medium text-zinc-400 mb-1.5">
-                Gemini Model
+                {t('wizard.userInput.geminiModelLabel')}
               </label>
               <Input
                 type="text"
@@ -183,7 +215,7 @@ const UserInput: React.FC<UserInputProps> = ({
                 className="text-xs py-1.5 font-mono"
               />
               <p className="text-xs text-zinc-500 mt-1">
-                Type any Gemini model ID — empty means the default ({GEMINI_MODEL_NAME})
+                {t('wizard.userInput.geminiModelHelp', { defaultModel: GEMINI_MODEL_NAME })}
               </p>
             </div>
           </div>
@@ -195,7 +227,7 @@ const UserInput: React.FC<UserInputProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-zinc-400 mb-1.5">
-                  Ollama Endpoint / Proxy
+                  {t('wizard.userInput.ollamaEndpointLabel')}
                 </label>
                 <Input
                   type="text"
@@ -212,14 +244,14 @@ const UserInput: React.FC<UserInputProps> = ({
                   className="text-xs py-1.5"
                 />
                 <p className="text-xs text-zinc-500 mt-1">
-                  Default /api/ollama (proxied via Vite without CORS)
+                  {t('wizard.userInput.ollamaEndpointHelp')}
                 </p>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-zinc-400">
-                    Ollama Model
+                    {t('wizard.userInput.ollamaModelLabel')}
                   </label>
                   <button
                     type="button"
@@ -227,7 +259,7 @@ const UserInput: React.FC<UserInputProps> = ({
                     disabled={isFetchingModels}
                     className="text-xs text-zinc-400 hover:text-zinc-300 underline font-medium flex items-center gap-1 disabled:opacity-50"
                   >
-                    {isFetchingModels ? 'Loading...' : 'Fetch Ollama Models'}
+                    {isFetchingModels ? t('wizard.userInput.loading') : t('wizard.userInput.fetchOllamaModels')}
                   </button>
                 </div>
 
@@ -262,8 +294,8 @@ const UserInput: React.FC<UserInputProps> = ({
                 )}
                 <p className="text-xs text-zinc-500 mt-1">
                   {ollamaModels.length > 0
-                    ? `Selected from ${ollamaModels.length} models Ollama reports`
-                    : `Click "Fetch Ollama Models" to retrieve models`}
+                    ? t('wizard.userInput.selectedFromModels', { count: ollamaModels.length })
+                    : t('wizard.userInput.clickFetchModels')}
                 </p>
               </div>
             </div>
@@ -279,19 +311,14 @@ const UserInput: React.FC<UserInputProps> = ({
                 }}
                 className="accent-zinc-200"
               />
-              <span className="font-medium">Reasoning (think)</span>
+              <span className="font-medium">{t('wizard.userInput.reasoningLabel')}</span>
             </label>
             <p className="text-xs text-zinc-500">
-              Reasoning models spend the output budget on thinking before answering — on capped
-              calls the answer gets cut off. Keep off unless the prose clearly needs it.
+              {t('wizard.userInput.reasoningHelp')}
             </p>
 
             <p className="text-xs text-zinc-500">
-              A cross-encoder reads each chapter plan against finished prose, and an NLI head
-              reads the scene's claims against confirmed state, before a word is written —
-              the only check that catches a scene retold in different words. Both run on your
-              machine; the weights download once with progress shown. There is no setting: a
-              check you can quietly turn down is a check nobody can trust the absence of.
+              {t('wizard.userInput.localChecksNote')}
             </p>
 
             {fetchStatus && (
@@ -322,11 +349,10 @@ const UserInput: React.FC<UserInputProps> = ({
                 : { enabled: false })}
               className="accent-zinc-200"
             />
-            <span className="font-medium">Separate editor model</span>
+            <span className="font-medium">{t('wizard.userInput.editorModelLabel')}</span>
           </label>
           <p className="text-xs text-zinc-500">
-            The editor reviews chapter plans and prose. A different model than the writer is strongly
-            recommended — off means the writer judges its own text, which is the weakest configuration.
+            {t('wizard.userInput.editorModelHelp')}
           </p>
 
           {validator.enabled && (
@@ -341,7 +367,7 @@ const UserInput: React.FC<UserInputProps> = ({
                       : 'text-zinc-400 hover:text-zinc-300'
                   }`}
                 >
-                  Gemini
+                  {t('wizard.userInput.providerGemini')}
                 </button>
                 <button
                   type="button"
@@ -352,14 +378,14 @@ const UserInput: React.FC<UserInputProps> = ({
                       : 'text-zinc-400 hover:text-zinc-300'
                   }`}
                 >
-                  Ollama
+                  {t('wizard.userInput.providerOllama')}
                 </button>
               </div>
 
               {validator.provider === 'gemini' ? (
                 <div>
                   <label className="block text-sm font-medium text-zinc-400 mb-1.5">
-                    Editor Gemini Model
+                    {t('wizard.userInput.editorGeminiLabel')}
                   </label>
                   <Input
                     type="text"
@@ -375,14 +401,14 @@ const UserInput: React.FC<UserInputProps> = ({
                     className="text-xs py-1.5 font-mono"
                   />
                   <p className="text-xs text-zinc-500 mt-1">
-                    Pick a different model than the writer — empty means the default ({GEMINI_MODEL_NAME})
+                    {t('wizard.userInput.editorGeminiHelp', { defaultModel: GEMINI_MODEL_NAME })}
                   </p>
                 </div>
               ) : (
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-sm font-medium text-zinc-400">
-                      Editor Ollama Model
+                      {t('wizard.userInput.editorOllamaLabel')}
                     </label>
                     <button
                       type="button"
@@ -390,7 +416,7 @@ const UserInput: React.FC<UserInputProps> = ({
                       disabled={isFetchingModels}
                       className="text-xs text-zinc-400 hover:text-zinc-300 underline font-medium flex items-center gap-1 disabled:opacity-50"
                     >
-                      {isFetchingModels ? 'Loading...' : 'Fetch Ollama Models'}
+                      {isFetchingModels ? t('wizard.userInput.loading') : t('wizard.userInput.fetchOllamaModels')}
                     </button>
                   </div>
                   {ollamaModels.length > 0 ? (
@@ -415,53 +441,78 @@ const UserInput: React.FC<UserInputProps> = ({
                     />
                   )}
                   <p className="text-xs text-zinc-500 mt-1">
-                    Uses the same Ollama endpoint as the writer
+                    {t('wizard.userInput.editorOllamaHelp')}
                   </p>
                 </div>
               )}
             </div>
           )}
         </div>
-
+        </>
+        )}
       </div>
 
       <div>
         <label htmlFor="storyPremise" className="block text-sm font-medium text-zinc-400 mb-1.5">
-          Story premise
+          {t('wizard.userInput.storyPremiseLabel')}
         </label>
         <TextArea
           id="storyPremise"
           value={storyPremise}
           onChange={(e) => setStoryPremise(e.target.value)}
-          placeholder="Describe your story idea (core conflict, protagonist goals, setting)..."
+          placeholder={t('wizard.userInput.storyPremisePlaceholder')}
           rows={5}
           required
-          maxLength={1200} 
+          maxLength={2000}
         />
-        <p className="text-xs text-zinc-500 mt-1">Maximum 1200 characters.</p>
+        <p className="text-xs text-zinc-500 mt-1">{t('wizard.userInput.storyPremiseMaxLength')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="genre" className="block text-sm font-medium text-zinc-400 mb-1.5">
-            Genre
+            {t('wizard.userInput.genreLabel')}
           </label>
-          <Select
-            id="genre"
-            value={genre}
-            onChange={(e) => setGenre(e.target.value)}
-          >
-            {Object.entries(GENRE_CONFIGS).map(([key, config]) => (
-              <option key={key} value={key}>
-                {config.name} — {config.description}
-              </option>
-            ))}
-          </Select>
+          {genreIsCustom ? (
+            <div className="flex gap-2">
+              <Input
+                id="genre"
+                type="text"
+                autoComplete="off"
+                value={genre}
+                onChange={(e) => setGenre(e.target.value)}
+                placeholder={t('wizard.userInput.genreCustomPlaceholder')}
+              />
+              <button
+                type="button"
+                onClick={() => { setGenreIsCustom(false); setGenre(Object.keys(GENRE_CONFIGS)[0]); }}
+                className="text-xs px-2 text-zinc-400 hover:text-zinc-200 whitespace-nowrap"
+              >
+                {t('wizard.userInput.genrePresetsLink')}
+              </button>
+            </div>
+          ) : (
+            <Select
+              id="genre"
+              value={genre}
+              onChange={(e) => {
+                if (e.target.value === '__custom__') { setGenreIsCustom(true); setGenre(''); }
+                else setGenre(e.target.value);
+              }}
+            >
+              {Object.entries(GENRE_CONFIGS).map(([key, config]) => (
+                <option key={key} value={key}>
+                  {config.name} — {config.description}
+                </option>
+              ))}
+              <option value="__custom__">{t('wizard.userInput.genreCustomOption')}</option>
+            </Select>
+          )}
         </div>
 
         <div>
           <label htmlFor="numChapters" className="block text-sm font-medium text-zinc-400 mb-1.5">
-            Number of Chapters
+            {t('wizard.userInput.numChaptersLabel')}
           </label>
           <Input
             id="numChapters"
@@ -472,15 +523,15 @@ const UserInput: React.FC<UserInputProps> = ({
             max={100}
             required
           />
-           <p className="text-xs text-zinc-500 mt-1">{MIN_CHAPTERS}–100 chapters</p>
+           <p className="text-xs text-zinc-500 mt-1">{t('wizard.userInput.numChaptersHelp', { min: MIN_CHAPTERS })}</p>
         </div>
 
         <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
           {([
-            ['targetAudience', 'Target audience', 'adult'],
-            ['narrativeVoice', 'Narrative voice / POV', 'third-limited'],
-            ['tone', 'Tone', 'serious'],
-            ['writingStyle', 'Style and voice notes', 'descriptive'],
+            ['targetAudience', t('wizard.userInput.fieldTargetAudience'), 'adult'],
+            ['narrativeVoice', t('wizard.userInput.fieldNarrativeVoice'), 'third-limited'],
+            ['tone', t('wizard.userInput.fieldTone'), 'serious'],
+            ['writingStyle', t('wizard.userInput.fieldWritingStyle'), 'descriptive'],
           ] as const).map(([key, label, fallback]) => (
             <div key={key}>
               <label htmlFor={key} className="block text-sm font-medium text-zinc-400 mb-1.5">{label}</label>
@@ -489,71 +540,81 @@ const UserInput: React.FC<UserInputProps> = ({
             </div>
           ))}
           <div>
-            <label htmlFor="targetWords" className="block text-sm font-medium text-zinc-400 mb-1.5">Target words per chapter</label>
-            <Input id="targetWords" type="number" min={300} max={10000} step={100}
-              value={storySettings.targetWordsPerChapter || 4000}
-              onChange={event => setStorySettings({ ...storySettings, targetWordsPerChapter: Number(event.target.value) })} />
+            <label htmlFor="targetWordsMin" className="block text-sm font-medium text-zinc-400 mb-1.5">{t('wizard.userInput.targetWordsLabel')}</label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="targetWordsMin"
+                type="number" min={300} max={10000} step={100}
+                value={storySettings.targetWordsPerChapterMin ?? 3000}
+                onChange={event => setStorySettings({ ...storySettings, targetWordsPerChapterMin: Number(event.target.value) })}
+              />
+              <span className="text-zinc-500 text-sm">–</span>
+              <Input
+                id="targetWordsMax"
+                type="number" min={300} max={10000} step={100}
+                value={storySettings.targetWordsPerChapterMax ?? 5000}
+                onChange={event => setStorySettings({ ...storySettings, targetWordsPerChapterMax: Number(event.target.value) })}
+              />
+            </div>
           </div>
           <div>
-            <label htmlFor="tense" className="block text-sm font-medium text-zinc-400 mb-1.5">Tense</label>
+            <label htmlFor="tense" className="block text-sm font-medium text-zinc-400 mb-1.5">{t('wizard.userInput.tenseLabel')}</label>
             <Select id="tense" value={storySettings.tense || 'past'} onChange={event => setStorySettings({ ...storySettings, tense: event.target.value as StorySettings['tense'] })}>
-              <option value="past">Past</option><option value="present">Present</option>
+              <option value="past">{t('wizard.userInput.tensePast')}</option><option value="present">{t('wizard.userInput.tensePresent')}</option>
             </Select>
           </div>
           <div>
-            <label htmlFor="ending" className="block text-sm font-medium text-zinc-400 mb-1.5">Ending</label>
+            <label htmlFor="ending" className="block text-sm font-medium text-zinc-400 mb-1.5">{t('wizard.userInput.endingLabel')}</label>
             <Select id="ending" value={storySettings.ending || 'closed'} onChange={event => setStorySettings({ ...storySettings, ending: event.target.value as StorySettings['ending'] })}>
-              <option value="closed">Resolved</option><option value="open">Intentionally open</option><option value="series">Part of a series</option>
+              <option value="closed">{t('wizard.userInput.endingClosed')}</option><option value="open">{t('wizard.userInput.endingOpen')}</option><option value="series">{t('wizard.userInput.endingSeries')}</option><option value="ongoing">{t('wizard.userInput.endingOngoing')}</option>
             </Select>
           </div>
         </div>
       </div>
 
       <div className="pt-2">
-        <p className="text-xs text-zinc-500">Chapters are written sequentially with story memory. Optional editing is available after the book is complete.</p>
+        <p className="text-xs text-zinc-500">{t('wizard.userInput.sequentialNote')}</p>
       </div>
 
       <div className="flex justify-end pt-2">
         <Button type="submit" disabled={isLoading || !storyPremise || numChapters < MIN_CHAPTERS} variant="primary">
-          {isLoading ? 'Generating Outline...' : 'Start Generation'}
+          {isLoading ? t('wizard.userInput.generatingOutline') : t('wizard.userInput.startGeneration')}
         </Button>
       </div>
 
       <div className="mt-10 pt-8 border-t border-zinc-800 space-y-6 text-zinc-300">
         <div>
           <h2 className="text-xs font-semibold text-zinc-400 uppercase">
-            How your manuscript develops
+            {t('wizard.userInput.processHeading')}
           </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div className="space-y-1">
-            <h3 className="text-xs font-medium text-zinc-300 uppercase">01. Master Story Outline</h3>
+            <h3 className="text-xs font-medium text-zinc-300 uppercase">{t('wizard.userInput.processOutlineTitle')}</h3>
             <p className="text-xs text-zinc-500">
-              Establishes premise, characters, central conflicts, recurring motifs, and comprehensive chapter-by-chapter plans.
+              {t('wizard.userInput.processOutlineDesc')}
             </p>
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-xs font-medium text-zinc-300 uppercase">02. Scene writing</h3>
+            <h3 className="text-xs font-medium text-zinc-300 uppercase">{t('wizard.userInput.processSceneTitle')}</h3>
             <p className="text-xs text-zinc-500">
-              Each scene follows its characters’ goals, conflicts and consequential choices in your requested voice.
+              {t('wizard.userInput.processSceneDesc')}
             </p>
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-xs font-medium text-zinc-300 uppercase">03. Continuity</h3>
+            <h3 className="text-xs font-medium text-zinc-300 uppercase">{t('wizard.userInput.processContinuityTitle')}</h3>
             <p className="text-xs text-zinc-500">
-              Accepted passages establish the story’s facts, and every later scene is written against them.
-              Problems are caught in the plan, before the prose exists; a finished chapter is never reopened.
+              {t('wizard.userInput.processContinuityDesc')}
             </p>
           </div>
 
           <div className="space-y-1">
-            <h3 className="text-xs font-medium text-zinc-300 uppercase">04. Audit &amp; export</h3>
+            <h3 className="text-xs font-medium text-zinc-300 uppercase">{t('wizard.userInput.processAuditTitle')}</h3>
             <p className="text-xs text-zinc-500">
-              The finished book is read once more against its own design, and what the checks found travels with it.
-              Download the manuscript, or the whole project with its plans, memory and run log.
+              {t('wizard.userInput.processAuditDesc')}
             </p>
           </div>
         </div>

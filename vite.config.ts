@@ -1,6 +1,9 @@
 import path from 'path';
 import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { projectDataServerPlugin } from './services/projectDataServer';
+import { userPreferencesServerPlugin } from './services/userPreferencesServer';
+import { userSecretsServerPlugin } from './services/userSecretsServer';
 
 function terminalLoggerPlugin(): Plugin {
   let lastKey = '';
@@ -89,10 +92,22 @@ export default defineConfig(({ mode }) => {
             target: env.OLLAMA_HOST || 'http://127.0.0.1:11434',
             rewrite: (p) => p.replace(/^\/api\/ollama/, ''),
             changeOrigin: true,
+          },
+          // A direct browser -> generativelanguage.googleapis.com call can fail with a bare
+          // "Failed to fetch" on some networks (corporate firewalls, some browser extensions,
+          // certain CORS-preflight edge cases) even with a valid key — the request never
+          // leaves the browser's network stack far enough to get an HTTP response at all.
+          // Routing it through this Node-side proxy instead makes the actual HTTPS call from
+          // the dev server, where none of that applies. Dev only: services/geminiService.ts
+          // only uses this baseUrl when import.meta.env.DEV is true.
+          '/api/gemini': {
+            target: 'https://generativelanguage.googleapis.com',
+            rewrite: (p) => p.replace(/^\/api\/gemini/, ''),
+            changeOrigin: true,
           }
         }
       },
-      plugins: [react(), terminalLoggerPlugin()],
+      plugins: [react(), terminalLoggerPlugin(), projectDataServerPlugin(), userPreferencesServerPlugin(), userSecretsServerPlugin()],
       define: {
         'process.env.API_KEY': JSON.stringify(apiKey),
         'process.env.GEMINI_API_KEY': JSON.stringify(apiKey)

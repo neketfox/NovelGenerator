@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useI18n } from '../i18n';
 
 interface BookStatisticsProps {
   bookContent: string;
@@ -6,6 +7,7 @@ interface BookStatisticsProps {
 }
 
 const BookStatistics: React.FC<BookStatisticsProps> = ({ bookContent, metadata }) => {
+  const { t } = useI18n();
   const stats = useMemo(() => {
     // Calculate word count
     const words = bookContent.trim().split(/\s+/).filter(w => w.length > 0);
@@ -54,41 +56,41 @@ const BookStatistics: React.FC<BookStatisticsProps> = ({ bookContent, metadata }
 
   const formatReadingTime = (minutes: number): string => {
     if (minutes < 60) {
-      return `${minutes} min`;
+      return t('wizard.bookStatistics.minutesShort', { minutes });
     }
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+    return t('wizard.bookStatistics.hoursMinutes', { hours, mins });
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       {/* Total Words */}
       <div className="bg-zinc-900 border border-zinc-800 p-4 rounded">
-        <div className="text-zinc-400 text-xs uppercase mb-1">Total Words</div>
+        <div className="text-zinc-400 text-xs uppercase mb-1">{t('wizard.bookStatistics.totalWords')}</div>
         <div className="text-zinc-100 text-lg font-semibold">{stats.totalWords.toLocaleString()}</div>
-        <div className="text-zinc-500 text-xs mt-1">{stats.characters.toLocaleString()} characters</div>
+        <div className="text-zinc-500 text-xs mt-1">{t('wizard.bookStatistics.charactersCount', { count: stats.characters.toLocaleString() })}</div>
       </div>
 
       {/* Reading Time */}
       <div className="bg-zinc-900 border border-zinc-800 p-4 rounded">
-        <div className="text-zinc-400 text-xs uppercase mb-1">Reading Time</div>
+        <div className="text-zinc-400 text-xs uppercase mb-1">{t('wizard.bookStatistics.readingTime')}</div>
         <div className="text-zinc-100 text-lg font-semibold">{formatReadingTime(stats.readingTimeMinutes)}</div>
-        <div className="text-zinc-500 text-xs mt-1">~200 words/min</div>
+        <div className="text-zinc-500 text-xs mt-1">{t('wizard.bookStatistics.wordsPerMin')}</div>
       </div>
 
       {/* Chapters */}
       <div className="bg-zinc-900 border border-zinc-800 p-4 rounded">
-        <div className="text-zinc-400 text-xs uppercase mb-1">Chapters</div>
+        <div className="text-zinc-400 text-xs uppercase mb-1">{t('wizard.bookStatistics.chapters')}</div>
         <div className="text-zinc-100 text-lg font-semibold">{stats.chapterCount}</div>
-        <div className="text-zinc-500 text-xs mt-1">{stats.avgWordsPerChapter.toLocaleString()} words avg</div>
+        <div className="text-zinc-500 text-xs mt-1">{t('wizard.bookStatistics.wordsAvg', { count: stats.avgWordsPerChapter.toLocaleString() })}</div>
       </div>
 
       {/* Dialogue Ratio */}
       <div className="bg-zinc-900 border border-zinc-800 p-4 rounded">
-        <div className="text-zinc-400 text-xs uppercase mb-1">Dialogue</div>
+        <div className="text-zinc-400 text-xs uppercase mb-1">{t('wizard.bookStatistics.dialogue')}</div>
         <div className="text-zinc-100 text-lg font-semibold">{stats.dialogueRatio}%</div>
-        <div className="text-zinc-500 text-xs mt-1">of content</div>
+        <div className="text-zinc-500 text-xs mt-1">{t('wizard.bookStatistics.ofContent')}</div>
       </div>
     </div>
   );

@@ -31,6 +31,10 @@ dist-ssr
 # Generated manuscripts, checkpoints and raw model responses
 runs/
 
+# Studio project data (per-project JSON, written by services/projectDataServer.ts
+# in dev). Personal manuscripts, not source: a repository is not a database.
+data/
+
 # Serena agent workspace
 .serena/
 

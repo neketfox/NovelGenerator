@@ -279,8 +279,11 @@ export type ChapterMode = 'full' | 'scene';
 // Story settings for genre, tone, and narrative style
 export interface StorySettings {
   tense?: 'past' | 'present';
-  ending?: 'closed' | 'open' | 'series';
+  ending?: 'closed' | 'open' | 'series' | 'ongoing';
+  /** @deprecated superseded by targetWordsPerChapterMin/Max; kept only for old saved settings. */
   targetWordsPerChapter?: number;
+  targetWordsPerChapterMin?: number;
+  targetWordsPerChapterMax?: number;
   genre?: string;
   narrativeVoice?: string;
   tone?: string;

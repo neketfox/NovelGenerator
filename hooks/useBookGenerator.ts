@@ -12,7 +12,7 @@ import { playSuccessSound } from '../utils/soundUtils';
 const DEFAULT_SETTINGS: StorySettings = {
   genre: 'fantasy', narrativeVoice: 'third-limited', tone: 'serious', targetAudience: 'adult',
   writingStyle: 'descriptive', tense: 'past',
-  ending: 'closed', targetWordsPerChapter: 4000,
+  ending: 'closed', targetWordsPerChapterMin: 3000, targetWordsPerChapterMax: 5000,
 };
 
 /**
@@ -243,19 +243,27 @@ export default function useBookGenerator() {
   async function startGeneration(premise: string, count: number) {
     if (busy.current || !storeRef.current) return;
     getStore().clearAll();
-    const wordsPerChapter = storySettings.targetWordsPerChapter || 4000;
+    // A range rather than one fixed number: read as an average for the book's total word
+    // budget, and also handed to the model as an explicit instruction so chapters are written
+    // at varying lengths within the range instead of all landing on the same word count.
+    const minWords = storySettings.targetWordsPerChapterMin || storySettings.targetWordsPerChapter || 3000;
+    const maxWords = storySettings.targetWordsPerChapterMax || storySettings.targetWordsPerChapter || 5000;
+    const avgWordsPerChapter = Math.round((minWords + maxWords) / 2);
     const input: ProjectInput = {
       premise,
       chapter_count: count,
       genre: storySettings.genre || 'fantasy',
-      target_total_words: wordsPerChapter * count,
+      target_total_words: avgWordsPerChapter * count,
       author_requirements: [
         storySettings.narrativeVoice ? `Voice: ${storySettings.narrativeVoice}.` : '',
         storySettings.tone ? `Tone: ${storySettings.tone}.` : '',
         storySettings.writingStyle ? `Style: ${storySettings.writingStyle}.` : '',
         storySettings.targetAudience ? `Audience: ${storySettings.targetAudience}.` : '',
         storySettings.tense ? `Tense: ${storySettings.tense}.` : '',
-        storySettings.ending ? `Ending: ${storySettings.ending}.` : '',
+        storySettings.ending === 'ongoing'
+          ? 'Ending: the story continues past this chapter count — do not resolve the central conflict or wrap up the book within it; leave the ending open for further chapters to be written later.'
+          : storySettings.ending ? `Ending: ${storySettings.ending}.` : '',
+        minWords !== maxWords ? `Chapter length: vary chapter lengths naturally between about ${minWords} and ${maxWords} words each, rather than making every chapter the same length.` : '',
       ].filter(Boolean).join(' ') || '(none)',
     };
     inputRef.current = input;

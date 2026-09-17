@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useI18n } from '../i18n';
 import { Button } from './common/Button';
 import BookStatistics from './BookStatistics';
 
@@ -11,6 +12,7 @@ interface BookDisplayProps {
 }
 
 const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, onReset }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'book' | 'metadata' | 'timeline'>('book');
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
   const [bookViewMode, setBookViewMode] = useState<'rendered' | 'raw'>('rendered');
@@ -34,7 +36,7 @@ const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, on
       setTimeout(() => setCopiedStates(prev => ({ ...prev, [type]: false })), 2000);
     }).catch(err => {
       console.error('Failed to copy text: ', err);
-      alert('Failed to copy text. Please try manually.');
+      alert(t('wizard.bookDisplay.copyFailedAlert'));
     });
   };
   
@@ -54,7 +56,7 @@ const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, on
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-lg font-semibold text-zinc-100 uppercase mb-4">Generation Complete</h2>
+        <h2 className="text-lg font-semibold text-zinc-100 uppercase mb-4">{t('wizard.bookDisplay.title')}</h2>
         
         {/* Book Statistics */}
         <BookStatistics bookContent={bookContent} metadata={metadata} />
@@ -67,21 +69,21 @@ const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, on
           className={`py-2 px-4 text-xs font-semibold uppercase transition-colors duration-150
             ${activeTab === 'book' ? 'border-b-2 border-zinc-200 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
         >
-          Book Content
+          {t('wizard.bookDisplay.tabBook')}
         </button>
         <button
           onClick={() => setActiveTab('timeline')}
           className={`py-2 px-4 text-xs font-semibold uppercase transition-colors duration-150
             ${activeTab === 'timeline' ? 'border-b-2 border-zinc-200 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
         >
-          Timeline
+          {t('wizard.bookDisplay.tabTimeline')}
         </button>
         <button
           onClick={() => setActiveTab('metadata')}
           className={`py-2 px-4 text-xs font-semibold uppercase transition-colors duration-150
             ${activeTab === 'metadata' ? 'border-b-2 border-zinc-200 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
         >
-          Metadata
+          {t('wizard.bookDisplay.tabMetadata')}
         </button>
       </div>
 
@@ -94,23 +96,23 @@ const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, on
                 onClick={() => setBookViewMode('rendered')}
                 className={`px-3 py-1 rounded transition-colors ${bookViewMode === 'rendered' ? 'bg-zinc-800 text-zinc-100 font-medium' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
-                Rendered Markdown
+                {t('wizard.bookDisplay.viewRendered')}
               </button>
               <button
                 type="button"
                 onClick={() => setBookViewMode('raw')}
                 className={`px-3 py-1 rounded transition-colors ${bookViewMode === 'raw' ? 'bg-zinc-800 text-zinc-100 font-medium' : 'text-zinc-500 hover:text-zinc-300'}`}
               >
-                Raw Source
+                {t('wizard.bookDisplay.viewRaw')}
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button 
+              <Button
                 onClick={() => handleCopyToClipboard(bookContent, 'book')}
                 variant="secondary"
                 size="sm"
               >
-                {copiedStates['book'] ? 'Copied' : 'Copy Markdown'}
+                {copiedStates['book'] ? t('wizard.bookDisplay.copied') : t('wizard.bookDisplay.copyMarkdown')}
               </Button>
             </div>
           </div>
@@ -131,7 +133,7 @@ const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, on
 
       {activeTab === 'timeline' && (
         <div className="p-4 border border-zinc-800 rounded max-h-[60vh] overflow-y-auto">
-          <h3 className="text-sm font-semibold text-zinc-300 uppercase mb-6 text-center">Narrative Timeline</h3>
+          <h3 className="text-sm font-semibold text-zinc-300 uppercase mb-6 text-center">{t('wizard.bookDisplay.timelineTitle')}</h3>
           {timelineData && chapterSummaries ? (
               <div className="relative pl-8 border-l-2 border-zinc-700">
                   {Object.entries(timelineData).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([chapterNum, rawTimelineEntry]) => {
@@ -143,18 +145,18 @@ const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, on
                               <div className="absolute -left-[39px] top-1 h-4 w-4 bg-zinc-400 rounded-full border-4 border-zinc-950" aria-hidden="true"></div>
                               <p className="text-xs text-zinc-500">{timelineEntry.endTimeOfChapter}</p>
                               <h4 className="text-sm font-semibold text-zinc-300 mt-1 uppercase">
-                                  Chapter {chapterNum}: {chapterInfo?.title || 'Untitled'}
+                                  {t('wizard.bookDisplay.chapterHeading', { num: chapterNum, title: chapterInfo?.title || t('wizard.bookDisplay.untitled') })}
                               </h4>
                               <div className="mt-2 text-zinc-400 text-xs space-y-1 pl-2 border-l-2 border-zinc-800 ml-1">
-                                  <p><strong className="font-medium text-zinc-300">Time Elapsed:</strong> {timelineEntry.timeElapsed}</p>
-                                  {timelineEntry.specificMarkers && timelineEntry.specificMarkers !== 'None' && <p><strong className="font-medium text-zinc-300">Key Markers:</strong> {timelineEntry.specificMarkers}</p>}
+                                  <p><strong className="font-medium text-zinc-300">{t('wizard.bookDisplay.timeElapsed')}</strong> {timelineEntry.timeElapsed}</p>
+                                  {timelineEntry.specificMarkers && timelineEntry.specificMarkers !== 'None' && <p><strong className="font-medium text-zinc-300">{t('wizard.bookDisplay.keyMarkers')}</strong> {timelineEntry.specificMarkers}</p>}
                               </div>
                           </div>
                       );
                   })}
               </div>
           ) : (
-              <p className="text-center text-zinc-500 text-xs">Timeline metadata is not available.</p>
+              <p className="text-center text-zinc-500 text-xs">{t('wizard.bookDisplay.timelineUnavailable')}</p>
           )}
         </div>
       )}
@@ -167,14 +169,14 @@ const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, on
               variant="secondary"
               size="sm"
             >
-              {copiedStates['metadata'] ? 'Copied' : 'Copy JSON'}
+              {copiedStates['metadata'] ? t('wizard.bookDisplay.copied') : t('wizard.bookDisplay.copyJson')}
             </Button>
-             <Button 
+             <Button
               onClick={() => downloadFile(metadataJson, `${(metadata?.title || 'generated_book').replace(/\s+/g, '_')}_metadata.json`, 'application/json;charset=utf-8')}
               variant="secondary"
               size="sm"
             >
-              Download .json
+              {t('wizard.bookDisplay.downloadJson')}
             </Button>
           </div>
           <pre className="whitespace-pre-wrap text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 p-4 rounded max-h-[60vh] overflow-y-auto">
@@ -185,7 +187,7 @@ const BookDisplay: React.FC<BookDisplayProps> = ({ bookContent, metadataJson, on
       
       <div className="text-center mt-8">
         <Button onClick={onReset} variant="danger">
-          Start New Book
+          {t('wizard.bookDisplay.startNewBook')}
         </Button>
       </div>
 
