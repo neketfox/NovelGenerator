@@ -302,6 +302,10 @@ export interface StorySettings {
   chapterMode?: ChapterMode;
   skipEditing?: boolean;
   forwardOnly?: boolean;
+  /** Dialogue-driven prose with alternating first-person character POV per chapter/scene,
+   *  banter-forward scenes over narrator exposition — the contemporary-romance format
+   *  (Erin Watt, L.J. Shen, Ana Huang-style) rather than a single external narrating voice. */
+  dialogueHeavyPov?: boolean;
 }
 
 // Agent activity log for UI display

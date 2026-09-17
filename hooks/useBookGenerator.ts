@@ -265,6 +265,9 @@ export default function useBookGenerator() {
           ? 'Ending: the story continues past this chapter count — do not resolve the central conflict or wrap up the book within it; leave the ending open for further chapters to be written later.'
           : storySettings.ending ? `Ending: ${storySettings.ending}.` : '',
         minWords !== maxWords ? `Chapter length: vary chapter lengths naturally between about ${minWords} and ${maxWords} words each, rather than making every chapter the same length.` : '',
+        storySettings.dialogueHeavyPov
+          ? 'Narrative format: contemporary-romance style (in the vein of Erin Watt, L.J. Shen, Ana Huang). Write in first person, alternating point-of-view between the main characters — signal whose POV a chapter or scene is in clearly (e.g. a heading with the character\'s name) rather than leaving it to be inferred. Prioritize direct, voice-driven dialogue and banter between characters over narrator exposition and description; most scenes should be carried by what characters say to each other, not by the narrator describing events at a remove.'
+          : '',
       ].filter(Boolean).join(' ') || '(none)',
     };
     inputRef.current = input;

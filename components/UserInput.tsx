@@ -10,6 +10,12 @@ import { getStoredProviderConfig, getStoredValidatorConfig, saveStoredProviderCo
 import { fetchOllamaModels } from '../services/ollamaService';
 import { LLMProviderConfig, StorySettings } from '../types';
 
+const TONE_PRESETS = [
+  'serious', 'whimsical', 'dark', 'lighthearted', 'gritty', 'romantic', 'melancholic',
+  'hopeful', 'cynical', 'sardonic', 'tender', 'brooding', 'playful', 'urgent', 'wistful',
+  'eerie', 'satirical', 'epic', 'intimate', 'bittersweet', 'suspenseful',
+];
+
 interface UserInputProps {
   storyPremise: string;
   setStoryPremise: (value: string) => void;
@@ -45,6 +51,7 @@ const UserInput: React.FC<UserInputProps> = ({
   const [storyLanguageIsCustom, setStoryLanguageIsCustom] = useState(
     () => !!storySettings.storyLanguage && !['Ukrainian', 'Russian'].includes(storySettings.storyLanguage),
   );
+  const [toneIsCustom, setToneIsCustom] = useState(() => !!storySettings.tone && !TONE_PRESETS.includes(storySettings.tone));
   // The model fields show gemini-3.6-flash explicitly rather than leaving them blank with a
   // placeholder — same resolved model either way (an absent geminiModel already means "use the
   // default"), just visible instead of implied.
@@ -573,7 +580,6 @@ const UserInput: React.FC<UserInputProps> = ({
           {([
             ['targetAudience', t('wizard.userInput.fieldTargetAudience'), 'adult'],
             ['narrativeVoice', t('wizard.userInput.fieldNarrativeVoice'), 'third-limited'],
-            ['tone', t('wizard.userInput.fieldTone'), 'serious'],
             ['writingStyle', t('wizard.userInput.fieldWritingStyle'), 'descriptive'],
           ] as const).map(([key, label, fallback]) => (
             <div key={key}>
@@ -582,6 +588,42 @@ const UserInput: React.FC<UserInputProps> = ({
                 onChange={event => setStorySettings({ ...storySettings, [key]: event.target.value })} />
             </div>
           ))}
+          <div>
+            <label htmlFor="tone" className="block text-sm font-medium text-zinc-400 mb-1.5">{t('wizard.userInput.fieldTone')}</label>
+            {toneIsCustom ? (
+              <div className="flex gap-2">
+                <Input
+                  id="tone"
+                  type="text"
+                  autoComplete="off"
+                  value={storySettings.tone || ''}
+                  onChange={(e) => setStorySettings({ ...storySettings, tone: e.target.value })}
+                  placeholder="e.g. droll, feverish, wry…"
+                />
+                <button
+                  type="button"
+                  onClick={() => { setToneIsCustom(false); setStorySettings({ ...storySettings, tone: 'serious' }); }}
+                  className="text-xs px-2 text-zinc-400 hover:text-zinc-200 whitespace-nowrap"
+                >
+                  {t('wizard.userInput.genrePresetsLink')}
+                </button>
+              </div>
+            ) : (
+              <Select
+                id="tone"
+                value={storySettings.tone || 'serious'}
+                onChange={(e) => {
+                  if (e.target.value === '__custom__') { setToneIsCustom(true); setStorySettings({ ...storySettings, tone: '' }); }
+                  else setStorySettings({ ...storySettings, tone: e.target.value });
+                }}
+              >
+                {TONE_PRESETS.map((tone) => (
+                  <option key={tone} value={tone}>{tone}</option>
+                ))}
+                <option value="__custom__">{t('wizard.userInput.genreCustomOption')}</option>
+              </Select>
+            )}
+          </div>
           <div>
             <label htmlFor="targetWordsMin" className="block text-sm font-medium text-zinc-400 mb-1.5">{t('wizard.userInput.targetWordsLabel')}</label>
             <div className="flex items-center gap-2">
@@ -613,6 +655,19 @@ const UserInput: React.FC<UserInputProps> = ({
             </Select>
           </div>
         </div>
+      </div>
+
+      <div className="border border-zinc-800 rounded p-4 md:p-5">
+        <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={storySettings.dialogueHeavyPov ?? false}
+            onChange={(e) => setStorySettings({ ...storySettings, dialogueHeavyPov: e.target.checked })}
+            className="accent-zinc-200"
+          />
+          <span className="font-medium">{t('wizard.userInput.dialogueHeavyLabel')}</span>
+        </label>
+        <p className="text-xs text-zinc-500 mt-1.5">{t('wizard.userInput.dialogueHeavyHelp')}</p>
       </div>
 
       <div className="pt-2">
