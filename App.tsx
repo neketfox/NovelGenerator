@@ -178,36 +178,43 @@ const App: React.FC = () => {
     </>
   );
 
+  // Always visible, generating or not — this is the one place keys/usage/language live, so it
+  // must not disappear behind the compact full-bleed generation layout (isStudioLayout).
+  const alwaysVisibleControls = (
+    <div className={`w-full ${isStudioLayout ? 'max-w-[1920px]' : 'max-w-4xl'} px-4 md:px-8 pt-2 flex flex-wrap items-center justify-between gap-3 transition-all duration-300`}>
+      <div className="flex items-baseline gap-2">
+        <button type="button" onClick={goToDashboard} className="text-zinc-500 hover:text-zinc-300 text-sm mr-1">
+          {t('wizard.app.backToDashboard')}
+        </button>
+        <h1 className="text-2xl font-semibold wordmark">
+          NovelGenerator
+        </h1>
+        <span className="font-mono text-xs text-zinc-500">v4.2</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="hidden lg:block">
+          <UsageWidget />
+        </div>
+        <ThemeToggle />
+        <SystemManualToggle />
+        <button
+          type="button"
+          onClick={() => setShowKeys(true)}
+          className="h-7 text-xs px-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300 rounded transition-colors"
+        >
+          🔑
+        </button>
+        <LanguageSelector />
+      </div>
+    </div>
+  );
+
   return (
     <div className={`w-full bg-zinc-950 text-zinc-300 flex flex-col items-center selection:bg-zinc-700 selection:text-white ${isStudioLayout ? 'h-screen max-h-screen overflow-hidden p-2 md:p-3' : 'min-h-screen p-4 md:p-8'}`}>
+      {alwaysVisibleControls}
       {!isStudioLayout && (
       <header className="w-full max-w-4xl mb-6 px-4 md:px-8 transition-all duration-300">
-        {/* Row 1: branding, then app-level controls (theme, help, keys, language). */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-          <div className="flex items-baseline gap-2">
-            <button type="button" onClick={goToDashboard} className="text-zinc-500 hover:text-zinc-300 text-sm mr-1">
-              {t('wizard.app.backToDashboard')}
-            </button>
-            <h1 className="text-2xl font-semibold wordmark">
-              NovelGenerator
-            </h1>
-            <span className="font-mono text-xs text-zinc-500">v4.2</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <SystemManualToggle />
-            <button
-              type="button"
-              onClick={() => setShowKeys(true)}
-              className="h-7 text-xs px-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300 rounded transition-colors"
-            >
-              🔑
-            </button>
-            <LanguageSelector />
-          </div>
-        </div>
-
-        {/* Row 2: actions on the current project, and token/usage info. */}
+        {/* Actions on the current project, and token/usage info. */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-1.5">
           <div className="flex items-center gap-3">
           {saveControl}
@@ -250,10 +257,6 @@ const App: React.FC = () => {
               </button>
             </div>
           </details>
-          </div>
-
-          <div className="hidden lg:block">
-            <UsageWidget />
           </div>
         </div>
         <p className="text-zinc-500 text-xs  text-left">

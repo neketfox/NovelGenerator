@@ -180,7 +180,7 @@ export async function repairRepetition(
   }
   if (!targets.length) return { prose: input.prose, repaired: [], left: [] };
 
-  const system = systemContract();
+  const system = systemContract(input.design.language);
   const prompt = renderPrompt('P08_SPAN_REPAIR', {
     story_contract: JSON.stringify(input.design.contract),
     style_contract: JSON.stringify(input.design.style_contract),

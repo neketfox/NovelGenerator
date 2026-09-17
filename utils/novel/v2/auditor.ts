@@ -27,7 +27,7 @@ export function settleAuditStatus(report: FinalReport, finishedAllChapters: bool
 }
 
 export async function auditBook(input: AuditInput, finishedAllChapters: boolean, llm: NovelLLM): Promise<FinalReport> {
-  const system = systemContract();
+  const system = systemContract(input.design.language);
   const material = input.manuscript.map(m => `## Chapter ${m.chapter}\n\n${m.text}`).join('\n\n');
   const prompt = renderPrompt('P07_FINAL_AUDIT', {
     story_contract: JSON.stringify(input.design.contract),

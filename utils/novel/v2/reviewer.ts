@@ -95,8 +95,9 @@ export async function reviewPlan(
   relevantState: string,
   sourceExcerpts: string,
   llm: NovelLLM,
+  language?: string,
 ): Promise<PlanReview> {
-  const system = systemContract();
+  const system = systemContract(language);
   const prompt = renderPrompt('P02_PLAN_REVIEW', {
     review_scope: scope,
     story_contract: ctx.story_contract,
@@ -155,7 +156,7 @@ export async function designReviewedBook(
     const scope = round === 0
       ? 'Whole book design before any prose is written.'
       : `Re-verify after fixes. Previously raised:\n${priorSummary}\nJudge only whether those fixes worked and whether the fixes broke coherence; settled points stay settled.`;
-    const raw = await reviewPlan(ctx, scope, design, '', '', llm);
+    const raw = await reviewPlan(ctx, scope, design, '', '', llm, design.language);
     const charges = [
       ...groundingIssues(design, input.premise, round),
       ...givenCharges(design, round),
@@ -193,7 +194,7 @@ export async function designReviewedBook(
     // text for a whole revised construction gave it two jobs and two output
     // formats, and it answered with whichever it read last — a verdict the key
     // check rejected, or the construction handed back unchanged.
-    const system = systemContract();
+    const system = systemContract(design.language);
     const prompt = renderPrompt('P02_PLAN_REFINE', {
       story_contract: ctx.story_contract,
       previous_plan: JSON.stringify(design),
@@ -203,5 +204,6 @@ export async function designReviewedBook(
       ['contract', 'profile', 'dramatic_core', 'style_contract', 'characters', 'world_rules', 'causal_map', 'ending', 'chapter_map'],
       parsed => parsed, { temperature: 0.4, maxTokens: 16384, route: 'writer' });
     design = validateBookDesign(rawDesign, input.chapter_count);
+    design.language = input.language || 'English'; // validateBookDesign rebuilds the object from the raw refinement; re-stamp it
   }
 }

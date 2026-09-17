@@ -22,8 +22,8 @@ function cleanProse(text: unknown): string {
   return prose;
 }
 
-export async function writeSceneV2(input: SceneWriterInput, llm: NovelLLM): Promise<string> {
-  const system = systemContract();
+export async function writeSceneV2(input: SceneWriterInput, llm: NovelLLM, language?: string): Promise<string> {
+  const system = systemContract(language);
   const prompt = renderPrompt('P04_SCENE_WRITE', input.contextVars);
   try {
     return cleanProse(await llm(prompt, system, { temperature: 0.7, maxTokens: 8192, route: 'writer' }));

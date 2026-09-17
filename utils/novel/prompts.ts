@@ -43,8 +43,8 @@ const TEMPLATES: Record<PipelinePromptName, string> = {
 
 export const PIPELINE_PROMPT_NAMES = Object.keys(TEMPLATES) as PipelinePromptName[];
 
-export function systemContract(): string {
-  return fillTemplate('system-contract', systemContractRaw, {});
+export function systemContract(language?: string): string {
+  return fillTemplate('system-contract', systemContractRaw, { language: language || 'English' });
 }
 
 /** Every {{variable}} a template declares, so callers and tests can see the contract. */

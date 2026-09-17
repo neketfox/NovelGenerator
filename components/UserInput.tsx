@@ -42,6 +42,9 @@ const UserInput: React.FC<UserInputProps> = ({
   // Whether the genre field shows the preset dropdown or a free-text box: starts in text mode
   // whenever the incoming value isn't one of the known preset keys (e.g. a saved custom genre).
   const [genreIsCustom, setGenreIsCustom] = useState(() => !(genre in GENRE_CONFIGS));
+  const [storyLanguageIsCustom, setStoryLanguageIsCustom] = useState(
+    () => !!storySettings.storyLanguage && !['Ukrainian', 'Russian'].includes(storySettings.storyLanguage),
+  );
   // The model fields show gemini-3.6-flash explicitly rather than leaving them blank with a
   // placeholder — same resolved model either way (an absent geminiModel already means "use the
   // default"), just visible instead of implied.
@@ -466,6 +469,46 @@ const UserInput: React.FC<UserInputProps> = ({
           maxLength={2000}
         />
         <p className="text-xs text-zinc-500 mt-1">{t('wizard.userInput.storyPremiseMaxLength')}</p>
+      </div>
+
+      <div>
+        <label htmlFor="storyLanguage" className="block text-sm font-medium text-zinc-400 mb-1.5">
+          {t('wizard.userInput.storyLanguageLabel')}
+        </label>
+        {storyLanguageIsCustom ? (
+          <div className="flex gap-2">
+            <Input
+              id="storyLanguage"
+              type="text"
+              autoComplete="off"
+              value={storySettings.storyLanguage || ''}
+              onChange={(e) => setStorySettings({ ...storySettings, storyLanguage: e.target.value })}
+              placeholder={t('wizard.userInput.storyLanguageCustomPlaceholder')}
+            />
+            <button
+              type="button"
+              onClick={() => { setStoryLanguageIsCustom(false); setStorySettings({ ...storySettings, storyLanguage: undefined }); }}
+              className="text-xs px-2 text-zinc-400 hover:text-zinc-200 whitespace-nowrap"
+            >
+              {t('wizard.userInput.genrePresetsLink')}
+            </button>
+          </div>
+        ) : (
+          <Select
+            id="storyLanguage"
+            value={storySettings.storyLanguage || ''}
+            onChange={(e) => {
+              if (e.target.value === '__custom__') { setStoryLanguageIsCustom(true); setStorySettings({ ...storySettings, storyLanguage: '' }); }
+              else setStorySettings({ ...storySettings, storyLanguage: e.target.value || undefined });
+            }}
+          >
+            <option value="">{t('wizard.userInput.storyLanguageEnglish')}</option>
+            <option value="Ukrainian">Українська</option>
+            <option value="Russian">Русский</option>
+            <option value="__custom__">{t('wizard.userInput.genreCustomOption')}</option>
+          </Select>
+        )}
+        <p className="text-xs text-zinc-500 mt-1">{t('wizard.userInput.storyLanguageHelp')}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

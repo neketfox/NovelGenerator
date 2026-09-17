@@ -144,12 +144,46 @@ function rotationOrder(): GeminiKeySlot[] {
   return [...pool].sort((a, b) => (a.id === activeKeyId ? -1 : b.id === activeKeyId ? 1 : 0));
 }
 
-function isRateLimitOrForbidden(error: unknown): boolean {
+function isRateLimit(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return /429|RESOURCE_EXHAUSTED|403|PERMISSION_DENIED/i.test(message);
+  return /429|RESOURCE_EXHAUSTED|quota|rate limit/i.test(message);
+}
+
+function isForbidden(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /403|PERMISSION_DENIED/i.test(message);
 }
 
 export { SchemaType } from '@google/generative-ai';
+
+// --- rate-limit wait state, surfaced to a UI banner (components/common/RateLimitBanner.tsx) ---
+
+const RATE_LIMIT_POLL_MS = 20_000; // re-check even if no key's own cooldown has elapsed yet
+const RATE_LIMIT_MAX_WAIT_MS = 5 * 60 * 1000; // never sleep longer than one cooldown window
+
+export interface RateLimitStatus {
+  /** null when nothing is currently rate-limited. */
+  resumeAt: number | null;
+  attempt: number;
+}
+
+let rateLimitStatus: RateLimitStatus = { resumeAt: null, attempt: 0 };
+const rateLimitListeners = new Set<(status: RateLimitStatus) => void>();
+export function onRateLimitChange(listener: (status: RateLimitStatus) => void): () => void {
+  rateLimitListeners.add(listener);
+  return () => rateLimitListeners.delete(listener);
+}
+export function getRateLimitStatus(): RateLimitStatus {
+  return rateLimitStatus;
+}
+function setRateLimitStatus(next: RateLimitStatus) {
+  rateLimitStatus = next;
+  rateLimitListeners.forEach((l) => l(next));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Runs a call with a raw API key, rotating through the user's key pool on 429/403. This is the
@@ -157,6 +191,12 @@ export { SchemaType } from '@google/generative-ai';
  * while lib/image/geminiImage.ts uses this directly to build a @google/genai client instead
  * (the only one of the two SDKs that supports image-output models), without duplicating the
  * rotation/cooldown logic.
+ *
+ * When every configured key is rate-limited at once, this does not fail the call: it waits for
+ * the soonest key to plausibly recover and tries again, forever, surfacing progress through
+ * getRateLimitStatus()/onRateLimitChange() so the UI can show "generation will slow down"
+ * instead of a dead run. A key rejected as forbidden (invalid/revoked) does not get this
+ * treatment — that is not something waiting fixes, so it still throws once the pool runs out.
  */
 export async function withApiKeyRotation<T>(call: (apiKey: string) => Promise<T>): Promise<T> {
   await ready; // make sure the pool loaded from disk before deciding there is none configured
@@ -166,24 +206,44 @@ export async function withApiKeyRotation<T>(call: (apiKey: string) => Promise<T>
     return call(envKey);
   }
 
-  const ordered = rotationOrder();
+  let attempt = 0;
+  for (;;) {
+    const ordered = rotationOrder();
+    let lastError: unknown;
+    let anyRateLimited = false;
 
-  let lastError: unknown;
-  for (const slot of ordered) {
-    try {
-      const result = await call(slot.key);
-      setActive(slot.id);
-      return result;
-    } catch (error) {
-      lastError = error;
-      if (isRateLimitOrForbidden(error)) {
-        disableSlot(slot.id);
-        continue; // try the next key in the pool
+    for (const slot of ordered) {
+      try {
+        const result = await call(slot.key);
+        setActive(slot.id);
+        if (rateLimitStatus.resumeAt) setRateLimitStatus({ resumeAt: null, attempt: 0 });
+        return result;
+      } catch (error) {
+        lastError = error;
+        if (isRateLimit(error)) {
+          anyRateLimited = true;
+          disableSlot(slot.id);
+          continue;
+        }
+        if (isForbidden(error)) {
+          disableSlot(slot.id);
+          continue;
+        }
+        throw error; // not a key-pool problem — surface it immediately
       }
-      throw error;
     }
+
+    if (!anyRateLimited) {
+      // Every remaining failure was "forbidden" (bad/revoked keys), not a quota to wait out.
+      throw lastError instanceof Error ? lastError : new Error('All configured Gemini keys failed.');
+    }
+
+    attempt += 1;
+    const soonestReset = Math.min(...cache.keys.map((s) => s.disabledUntil ?? Infinity));
+    const waitMs = Math.min(RATE_LIMIT_MAX_WAIT_MS, Math.max(RATE_LIMIT_POLL_MS, soonestReset - Date.now()));
+    setRateLimitStatus({ resumeAt: Date.now() + waitMs, attempt });
+    await sleep(waitMs);
   }
-  throw lastError instanceof Error ? lastError : new Error('All configured Gemini keys failed.');
 }
 
 /**

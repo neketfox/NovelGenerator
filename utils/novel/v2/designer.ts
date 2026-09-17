@@ -169,7 +169,7 @@ export function validateBookDesign(raw: unknown, chapterCount: number): BookDesi
 }
 
 export async function designBook(input: ProjectInput, llm: NovelLLM): Promise<BookDesign> {
-  const system = systemContract();
+  const system = systemContract(input.language);
   const prompt = renderPrompt('P01_BOOK_DESIGN', {
     premise: input.premise,
     genre: input.genre,
@@ -183,5 +183,7 @@ export async function designBook(input: ProjectInput, llm: NovelLLM): Promise<Bo
     parsed => parsed,
     { temperature: 0.4, maxTokens: 16384, route: 'writer' }
   );
-  return validateBookDesign(raw, input.chapter_count);
+  const design = validateBookDesign(raw, input.chapter_count);
+  design.language = input.language || 'English'; // stamped by code, read by every later stage
+  return design;
 }

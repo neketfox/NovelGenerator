@@ -174,6 +174,11 @@ export interface BookDesign {
   causal_map: CausalEvent[];
   ending: EndingDesign;
   chapter_map: ChapterMapEntry[];
+  /** Set by code from ProjectInput.language, never asked of the model. Read by every
+   *  downstream call's systemContract() so the whole book — not just the design step — is
+   *  written in the requested language. Optional so existing designs/fixtures without it
+   *  still type-check; absent means English (systemContract()'s own default). */
+  language?: string;
 }
 
 export interface PlanIssue {
@@ -403,4 +408,8 @@ export interface ProjectInput {
   genre: string;
   target_total_words: number;
   author_requirements: string;
+  /** Manuscript language, e.g. "Ukrainian". Absent means English. See BookDesign.language:
+   *  this is where it originates, stamped onto the design once by designBook and read from
+   *  there by every later stage instead of being threaded through each input shape. */
+  language?: string;
 }

@@ -113,7 +113,7 @@ export function validateChapterPlan(raw: unknown, chapter: number): ChapterPlan 
 
 export async function planChapter(input: ChapterPlannerInput, llm: NovelLLM): Promise<ChapterPlan> {
   const entry = input.design.chapter_map.find(item => item.chapter === input.chapter);
-  const system = systemContract();
+  const system = systemContract(input.design.language);
   const prompt = renderPrompt('P03_CHAPTER_PLAN', {
     book_design_digest: JSON.stringify({
       dramatic_core: input.design.dramatic_core,
@@ -163,7 +163,7 @@ export async function rebaseScenePlan(input: {
   state: StoryState;
   openThreads: string[];
 }, llm: NovelLLM): Promise<ScenePlan> {
-  const system = systemContract();
+  const system = systemContract(input.design.language);
   const prompt = renderPrompt('P03_SCENE_REBASE', {
     story_contract: JSON.stringify(input.design.contract),
     scene_plan: JSON.stringify(input.scene),

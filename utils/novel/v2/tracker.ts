@@ -124,8 +124,8 @@ export function validateDelta(raw: unknown, paragraphIds: string[] = []): StateD
   return raw as StateDelta;
 }
 
-export async function trackScene(input: TrackInput, llm: NovelLLM): Promise<StateDelta> {
-  const system = systemContract();
+export async function trackScene(input: TrackInput, llm: NovelLLM, language?: string): Promise<StateDelta> {
+  const system = systemContract(language);
   const paragraphs = paragraphsWithIds(input.sceneProse);
   const ids = paragraphs.map(p => p.id);
   const numbered = paragraphs.map(p => `[${p.id}] ${p.text}`).join('\n\n');

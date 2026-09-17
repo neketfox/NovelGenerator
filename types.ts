@@ -285,6 +285,15 @@ export interface StorySettings {
   targetWordsPerChapterMin?: number;
   targetWordsPerChapterMax?: number;
   genre?: string;
+  /**
+   * The manuscript's own language (e.g. "Ukrainian") — separate from the app UI's language.
+   * Threaded through as ProjectInput.language into every pipeline call's system contract, so
+   * it's a firm rule rather than a hint the model can drop. Note: the prose-quality checks
+   * (worn-phrase counting, signature-tic detection, the "it was not X, it was Y" construction)
+   * are pattern-matched against English typography and are not reliable for other languages —
+   * see ARCHITECTURE.md's "The manuscript is written in English" section.
+   */
+  storyLanguage?: string;
   narrativeVoice?: string;
   tone?: string;
   targetAudience?: string;

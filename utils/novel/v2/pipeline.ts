@@ -306,7 +306,7 @@ export class ChapterPipelineV2 implements ChapterPipeline {
         sceneProse: prose,
         sourceExcerpts: excerpts,
         openThreads: store.loadThreads().filter(item => item.status === 'open'),
-      }, llm);
+      }, llm, design.language);
       // Repair before tracking, never after: a replacement carries the same
       // information as the sentence it replaces, so memory is unaffected — and
       // running it here means the delta, the handoff and the tail all describe
@@ -329,7 +329,7 @@ export class ChapterPipelineV2 implements ChapterPipeline {
         this.flushRetries(store);
         return repair.prose;
       };
-      let prose = await deduplicate(await writeSceneV2({ contextVars: vars }, llm));
+      let prose = await deduplicate(await writeSceneV2({ contextVars: vars }, llm, design.language));
       let delta = await track(prose);
       const sceneRef = scene.id;
       let applied = applyDelta(store.loadState(), delta, sceneRef);
@@ -343,7 +343,7 @@ export class ChapterPipelineV2 implements ChapterPipeline {
         const prior = Array.isArray(startState.continuity_requirements) ? startState.continuity_requirements as string[] : [];
         startState.continuity_requirements = [...prior, ...applied.blockers.map(blocker => `Do not contradict confirmed state: ${blocker}`)];
         vars.scene_start_state = JSON.stringify(startState);
-        prose = await deduplicate(await writeSceneV2({ contextVars: vars }, llm));
+        prose = await deduplicate(await writeSceneV2({ contextVars: vars }, llm, design.language));
         delta = await track(prose);
         applied = applyDelta(store.loadState(), delta, sceneRef);
         if (applied.blockers.length) {

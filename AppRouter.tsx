@@ -6,6 +6,7 @@ import ProjectWorkspace from './components/editor/ProjectWorkspace';
 import LanguageSelector from './components/common/LanguageSelector';
 import ApiKeyManagerModal from './components/common/ApiKeyManagerModal';
 import UsageWidget from './components/usage/UsageWidget';
+import RateLimitBanner from './components/common/RateLimitBanner';
 import App from './App';
 
 const StudioHeader: React.FC = () => {
@@ -42,6 +43,7 @@ const Shell: React.FC = () => {
   const isWizard = location.pathname === '/project/new';
   return (
     <div className="min-h-screen flex flex-col">
+      <RateLimitBanner />
       {!isWizard && <StudioHeader />}
       <div className="flex-1">
         <Routes>

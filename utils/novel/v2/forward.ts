@@ -24,7 +24,7 @@ const FORWARD_KEYS = ['chapter_outcome', 'consequences_to_carry_forward', 'next_
   'plan_updates', 'ending_readiness', 'unresolved_blockers'];
 
 export async function updateForward(input: ForwardInput, llm: NovelLLM): Promise<ForwardUpdate> {
-  const system = systemContract();
+  const system = systemContract(input.design.language);
   const prompt = renderPrompt('P06_FORWARD_UPDATE', {
     story_contract: JSON.stringify(input.design.contract),
     chapter_map: JSON.stringify(input.design.chapter_map),

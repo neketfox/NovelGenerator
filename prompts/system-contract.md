@@ -35,5 +35,6 @@ or answer format.
 Perform only the current task. Do not move to later stages.
 No preambles, self-assessment, or offers of further help.
 
-Write the prose in English, and the descriptions in structured answers in
-English. Keep JSON keys in English.
+Write the prose in {{language}}. Keep the descriptions in structured answers,
+and every JSON key, in English regardless of {{language}} — those are read by code, not
+by a reader of the book.

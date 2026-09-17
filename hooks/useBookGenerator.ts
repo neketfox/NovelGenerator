@@ -253,6 +253,7 @@ export default function useBookGenerator() {
       premise,
       chapter_count: count,
       genre: storySettings.genre || 'fantasy',
+      language: storySettings.storyLanguage || undefined,
       target_total_words: avgWordsPerChapter * count,
       author_requirements: [
         storySettings.narrativeVoice ? `Voice: ${storySettings.narrativeVoice}.` : '',
