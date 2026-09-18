@@ -335,5 +335,22 @@
   "wizard.userInput.defaultNarrativeVoice": "Від третьої особи, обмежена перспектива, один POV на сцену/розділ",
   "wizard.userInput.defaultWritingStyle": "Сучасний романтичний стиль, живі та природні діалоги, емоційна напруга, сильна хімія між героями, багато діалогів і сцен взаємодії. Легкий гумор, внутрішні думки героя, помірні описи без перевантаження. Динамічний темп, емоційні реакції та поступовий розвиток стосунків.",
   "usage.promptTokens": "Токени запиту",
-  "usage.completionTokens": "Токени відповіді"
+  "usage.completionTokens": "Токени відповіді",
+  "editor.tab.requests": "Правки",
+  "codex.voice": "Голос",
+  "codex.behavior": "Поведінка",
+  "codex.limitations": "Обмеження",
+  "codex.knowledge": "Знає зараз",
+  "codex.locationsEmpty": "Сцени ще не сплановані — локацій поки немає.",
+  "codex.addFactPlaceholder": "Факт, якого книга тримається…",
+  "codex.addRulePlaceholder": "Правило, якому підкоряється світ…",
+  "requests.explainer": "Прохання стає в чергу і застосовується між розділами — правка посеред сцени змінила б пам'ять, під яку сцену вже написано.",
+  "requests.empty": "Поки нічого не просили.",
+  "requests.placeholder": "наприклад: більше перепалок між ними; вона не згадує лист; завершити розділ біля річки",
+  "requests.queue": "У чергу",
+  "requests.pending": "у черзі",
+  "requests.applied": "застосовано",
+  "requests.kind.note": "Нотатка письменнику",
+  "requests.kind.chapter": "До розділу",
+  "requests.kind.memory": "Виправити пам'ять"
 }

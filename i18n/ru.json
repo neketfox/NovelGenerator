@@ -335,5 +335,22 @@
   "wizard.userInput.defaultNarrativeVoice": "От третьего лица, ограниченная перспектива, один POV на сцену/главу",
   "wizard.userInput.defaultWritingStyle": "Современный романтический стиль, живые и естественные диалоги, эмоциональное напряжение, сильная химия между героями, много диалогов и сцен взаимодействия. Лёгкий юмор, внутренние мысли героя, умеренные описания без перегруза. Динамичный темп, эмоциональные реакции и постепенное развитие отношений.",
   "usage.promptTokens": "Токены запроса",
-  "usage.completionTokens": "Токены ответа"
+  "usage.completionTokens": "Токены ответа",
+  "editor.tab.requests": "Правки",
+  "codex.voice": "Голос",
+  "codex.behavior": "Поведение",
+  "codex.limitations": "Ограничения",
+  "codex.knowledge": "Знает сейчас",
+  "codex.locationsEmpty": "Сцены ещё не спланированы — локаций пока нет.",
+  "codex.addFactPlaceholder": "Факт, которого книга держится…",
+  "codex.addRulePlaceholder": "Правило, которому подчиняется мир…",
+  "requests.explainer": "Просьба ставится в очередь и применяется между главами — правка посреди сцены изменила бы память, под которую сцена уже написана.",
+  "requests.empty": "Пока ничего не просили.",
+  "requests.placeholder": "например: больше перепалок между ними; она не упоминает письмо; закончить главу у реки",
+  "requests.queue": "В очередь",
+  "requests.pending": "в очереди",
+  "requests.applied": "применено",
+  "requests.kind.note": "Заметка писателю",
+  "requests.kind.chapter": "К главе",
+  "requests.kind.memory": "Поправить память"
 }

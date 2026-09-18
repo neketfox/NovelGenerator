@@ -2,6 +2,7 @@ import { drainRetryNotices, type NovelLLM } from './llm';
 import { auditBook } from './auditor';
 import { designReviewedBook } from './reviewer';
 import { validateBookDesign } from './designer';
+import { applyPendingRequests } from './authorRequests';
 import { emptyState, MemoryProjectStore, type ProjectStore } from './store';
 import type { BookDesign, FinalReport, PlanReview, ProjectInput } from './types';
 
@@ -170,6 +171,16 @@ export class Orchestrator {
       const warnings: string[] = [...designWarnings];
       for (let chapter = 1; chapter <= input.chapter_count; chapter++) {
         this.onProgress('chapter', chapter);
+        // Between chapters, never inside one: an author's correction applied mid-scene would
+        // change the memory that scene was already written against. Each request lands in the
+        // artifact that already carries its kind of instruction (see authorRequests.ts).
+        const author = applyPendingRequests(this.store);
+        for (const request of author.applied) {
+          this.store.log('author-request', `Applied before chapter ${chapter}: ${request.text}`);
+        }
+        for (const request of author.refused) {
+          warnings.push(`Author request not applied (${request.refusedReason}): ${request.text}`);
+        }
         if (finished.has(chapter)) {
           this.store.log('skip', `Chapter ${chapter} already finished; manuscript and memory kept.`);
           continue;

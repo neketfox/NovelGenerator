@@ -7,6 +7,9 @@ import { ChapterPipelineV2 } from '../utils/novel/v2/pipeline';
 import { downloadJson, restoreSnapshot, snapshotProject } from '../utils/novel/v2/export';
 import { PersistentProjectStore } from '../utils/novel/v2/persistent';
 import { slugifyProjectName } from '../services/projectSlots';
+import { applyCodexEdit, readCodex, type CodexEdit } from '../utils/novel/v2/codex';
+import { applyPendingRequests, queueRequest, readRequests, type AuthorRequest } from '../utils/novel/v2/authorRequests';
+import { indexCodex, indexStore } from '../lib/rag/storeIndex';
 import type { ProjectInput } from '../utils/novel/v2/types';
 import { playSuccessSound } from '../utils/soundUtils';
 
@@ -249,6 +252,9 @@ export default function useBookGenerator(projectId?: string, onProjectCreated?: 
         refreshFromStore();
         if (store.manuscript().length >= input.chapter_count) publishFinal();
       }
+      // Make the book searchable by meaning: what a previous run wrote is memory this run
+      // can retrieve. Best-effort — an unavailable embedder leaves retrieval empty.
+      void indexStore(projectId, store);
       setStoreReady(true);
     }).catch(() => {
       if (live) setStoreReady(true);
@@ -368,6 +374,39 @@ export default function useBookGenerator(projectId?: string, onProjectCreated?: 
     setCurrentStep(GenerationStep.Idle);
   }
 
+  /**
+   * The codex and the request queue read and write the same store the run does, so an edit
+   * made here is the memory the next scene is written against — not a copy of it.
+   */
+  const [memoryRevision, setMemoryRevision] = useState(0);
+
+  function readCodexView() {
+    return storeRef.current ? readCodex(storeRef.current) : null;
+  }
+
+  function editCodex(edit: CodexEdit) {
+    if (!storeRef.current) return;
+    applyCodexEdit(storeRef.current, edit);
+    setMemoryRevision(revision => revision + 1);
+    // The semantic index follows the memory it indexes; a failed embed costs recall, not data.
+    if (storeRef.current.projectId) void indexCodex(storeRef.current.projectId, storeRef.current);
+  }
+
+  function listAuthorRequests(): AuthorRequest[] {
+    return storeRef.current ? readRequests(storeRef.current) : [];
+  }
+
+  function addAuthorRequest(kind: AuthorRequest['kind'], text: string, chapter?: number) {
+    if (!storeRef.current) return;
+    queueRequest(storeRef.current, { kind, text, chapter });
+    setMemoryRevision(revision => revision + 1);
+    // Nothing running means nothing will drain the queue on its own: apply it now.
+    if (!busy.current) {
+      applyPendingRequests(storeRef.current);
+      setMemoryRevision(revision => revision + 1);
+    }
+  }
+
   async function resetGenerator() {
     epoch.current++;
     busy.current = false;
@@ -395,6 +434,7 @@ export default function useBookGenerator(projectId?: string, onProjectCreated?: 
     isResumable: hasUnfinished && !isLoading,
     storeReady, exportProject, importProject,
     startGeneration, continueGeneration, pauseGeneration, resetGenerator, editSettings,
+    readCodexView, editCodex, listAuthorRequests, addAuthorRequest, memoryRevision,
     finalBookContent,
     finalMetadataJson,
     generatedChapters,

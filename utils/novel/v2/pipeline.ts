@@ -17,6 +17,7 @@ import { profileOf } from './profile';
 import { describeStateDigest } from './stateDigest';
 import { numericContradictions } from '../analytics';
 import { repairRepetition } from './repair';
+import { indexScene, retrieveMemory } from '../../../lib/rag/storeIndex';
 import type { BookDesign, ChapterPlan, StoryState } from './types';
 
 /**
@@ -329,6 +330,13 @@ export class ChapterPipelineV2 implements ChapterPipeline {
         this.flushRetries(store);
         return repair.prose;
       };
+      // The book's own memory, retrieved by meaning rather than by reference: the writer gets
+      // the character cards, world rules and earlier prose that read as related to this scene.
+      // Unavailable retrieval (no local model, nothing indexed yet) leaves the default in place.
+      if (store.projectId) {
+        const retrieved = await retrieveMemory(store.projectId, `${scene.function} ${scene.development} ${scene.required_outcome}`);
+        if (retrieved.length) vars.relevant_memory = retrieved.join('\n');
+      }
       let prose = await deduplicate(await writeSceneV2({ contextVars: vars }, llm, design.language));
       let delta = await track(prose);
       const sceneRef = scene.id;
@@ -392,6 +400,9 @@ export class ChapterPipelineV2 implements ChapterPipeline {
       });
       const numbered = paragraphsWithIds(prose);
       store.saveScene({ id: scene.id, chapter, prose, paragraph_ids: numbered.map(p => p.id), plan: scene, delta, resolutions, handoff });
+      // Accepted prose joins the semantic index, so the next scene can retrieve it. Indexing
+      // runs alongside the book rather than blocking it: a failed embed costs recall, not a page.
+      if (store.projectId) void indexScene(store.projectId, scene.id, chapter, prose);
       const tail = numbered.at(-1)?.text || '';
       previousTail = tail.slice(-600);
       excerpts.push(`[${scene.id}] ${tail.slice(-300)}`);

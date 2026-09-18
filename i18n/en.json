@@ -335,5 +335,22 @@
   "wizard.userInput.defaultNarrativeVoice": "Third person limited, one POV per scene/chapter",
   "wizard.userInput.defaultWritingStyle": "Contemporary romance style: lively, natural dialogue, emotional tension, strong chemistry between the leads, plenty of dialogue and interaction scenes. Light humour, the POV character's inner thoughts, moderate description without overloading. Brisk pacing, emotional reactions, and a relationship that develops step by step.",
   "usage.promptTokens": "Prompt tokens",
-  "usage.completionTokens": "Completion tokens"
+  "usage.completionTokens": "Completion tokens",
+  "editor.tab.requests": "Requests",
+  "codex.voice": "Voice",
+  "codex.behavior": "Behaviour",
+  "codex.limitations": "Limits",
+  "codex.knowledge": "Knows now",
+  "codex.locationsEmpty": "No scenes planned yet, so no locations to show.",
+  "codex.addFactPlaceholder": "A fact the book should hold to…",
+  "codex.addRulePlaceholder": "A rule this world obeys…",
+  "requests.explainer": "Asked for now, applied between chapters — an edit landing mid-scene would change the memory that scene was written against.",
+  "requests.empty": "Nothing asked for yet.",
+  "requests.placeholder": "e.g. more banter between them; she never mentions the letter; end the chapter at the river",
+  "requests.queue": "Queue request",
+  "requests.pending": "queued",
+  "requests.applied": "applied",
+  "requests.kind.note": "Note for the writer",
+  "requests.kind.chapter": "For a chapter",
+  "requests.kind.memory": "Fix memory"
 }

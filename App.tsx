@@ -21,6 +21,9 @@ import LanguageSelector from './components/common/LanguageSelector';
 import ApiKeyManagerModal from './components/common/ApiKeyManagerModal';
 import UsageStatsModal from './components/usage/UsageStatsModal';
 import ExportAsModal from './components/common/ExportAsModal';
+import CodexPanel from './components/codex/CodexPanel';
+import CoverPanel from './components/editor/CoverPanel';
+import AuthorRequestPanel from './components/editor/AuthorRequestPanel';
 import { chaptersToStudioProject } from './services/importFromGenerator';
 
 const App: React.FC = () => {
@@ -58,6 +61,11 @@ const App: React.FC = () => {
     exportProject,
     importProject,
     storeReady,
+    readCodexView,
+    editCodex,
+    listAuthorRequests,
+    addAuthorRequest,
+    memoryRevision,
   } = useBookGenerator(
     routeProjectId,
     // The book exists on disk from its first chapter: move the URL onto its slot so a closed
@@ -143,6 +151,20 @@ const App: React.FC = () => {
   const hasDraftContent = generatedChapters.some(chapter => chapter.content.trim());
 
   const goToDashboard = () => navigate('/');
+
+  // The side panels on the generation page read the live store, so they show the memory the
+  // run is actually writing against. memoryRevision is what tells them an edit landed.
+  const codexView = React.useMemo(
+    () => (storeReady ? readCodexView() : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [storeReady, memoryRevision, currentChapterProcessing, generatedChapters.length],
+  );
+  const authorRequests = React.useMemo(
+    () => (storeReady ? listAuthorRequests() : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [storeReady, memoryRevision, currentChapterProcessing],
+  );
+  const [cover, setCover] = React.useState<{ url?: string; history: { id: string; url: string; prompt: string; createdAt: string }[] }>({ history: [] });
 
   const workInProgressActions = (
     <>
@@ -330,6 +352,24 @@ const App: React.FC = () => {
             isLoading={isLoading}
             onResumeGeneration={handleStartGeneration}
             onPauseGeneration={pauseGeneration}
+            codexPanel={codexView ? <CodexPanel codex={codexView} onEdit={editCodex} /> : null}
+            coverPanel={
+              <CoverPanel
+                title={storyPremise.slice(0, 60) || 'Untitled'}
+                synopsis={storyPremise}
+                genre={storySettings.genre ?? ''}
+                currentCover={cover.url}
+                history={cover.history}
+                onChange={(url, history) => setCover({ url, history })}
+              />
+            }
+            requestPanel={
+              <AuthorRequestPanel
+                requests={authorRequests}
+                chapterCount={totalChaptersToProcess}
+                onQueue={(kind, text, chapter) => addAuthorRequest(kind, text, chapter)}
+              />
+            }
             headerActions={<>{saveControl}{workInProgressActions}</>}
             version="v4.2"
             onReset={handleReset}

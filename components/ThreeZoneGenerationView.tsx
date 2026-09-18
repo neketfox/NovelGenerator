@@ -28,6 +28,10 @@ export interface ThreeZoneGenerationViewProps {
   isLoading?: boolean;
   onResumeGeneration?: () => void;
   onPauseGeneration?: () => void;
+  /** Panels that read and write the same memory the run does: codex, cover, request queue. */
+  codexPanel?: React.ReactNode;
+  coverPanel?: React.ReactNode;
+  requestPanel?: React.ReactNode;
   /** The studio puts the wordmark and the global reset on the same strip as the run status. */
   version?: string;
   onReset?: () => void;
@@ -50,11 +54,15 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
   isLoading = false,
   onResumeGeneration,
   onPauseGeneration,
+  codexPanel,
+  coverPanel,
+  requestPanel,
 }) => {
   const { t } = useI18n();
   // Track selected chapter for viewing (defaults to active processing chapter)
   const [selectedChapterIdx, setSelectedChapterIdx] = useState<number>(0);
   const [showOutline, setShowOutline] = useState<boolean>(false);
+  const [sidePanel, setSidePanel] = useState<'inspector' | 'codex' | 'cover' | 'requests'>('inspector');
 
   // Sync selected chapter with currently processing chapter
   useEffect(() => {
@@ -297,15 +305,43 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
           )}
         </div>
 
-        {/* ZONE 3: chapter checks on top, agent telemetry below — half each */}
+        {/* ZONE 3: the book's own side panel — checks and telemetry, or the codex, the cover,
+            or the author's request queue. All four read and write the same memory the run does. */}
         {showInspector && (
           <div
             data-testid="zone-agent-inspector"
-            className="lg:col-span-2 flex flex-col h-full min-h-0 pl-4 text-left overflow-hidden"
+            className={`${sidePanel === 'inspector' ? 'lg:col-span-2' : 'lg:col-span-4'} flex flex-col h-full min-h-0 pl-4 text-left overflow-hidden`}
           >
-            {(isWritingProse || activeContent) && (
+            <div className="shrink-0 flex flex-wrap gap-1 pb-2">
+              {([
+                ['inspector', t('wizard.threeZone.agentInspector')],
+                ['codex', t('editor.tab.codex')],
+                ['cover', t('editor.tab.covers')],
+                ['requests', t('editor.tab.requests')],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSidePanel(key)}
+                  className={`px-2 py-0.5 text-xs rounded ${sidePanel === key ? 'bg-zinc-200 text-zinc-900' : 'text-zinc-400 hover:text-zinc-200'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {sidePanel !== 'inspector' && (
+              <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
+                {sidePanel === 'codex' && codexPanel}
+                {sidePanel === 'cover' && coverPanel}
+                {sidePanel === 'requests' && requestPanel}
+              </div>
+            )}
+
+            {sidePanel === 'inspector' && (isWritingProse || activeContent) && (
               <ChapterChecks content={activeContent} chapterNum={activeChapterNum} />
             )}
+            {sidePanel === 'inspector' && (
             <div className="border-t border-zinc-800 mt-2 pt-2 flex flex-col min-h-0 flex-1 overflow-hidden">
               <div className="shrink-0 flex items-baseline justify-between pb-2">
                 <h3 className="text-xs font-semibold uppercase text-zinc-500">{t('wizard.threeZone.agentInspector')}</h3>
@@ -342,6 +378,7 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
 

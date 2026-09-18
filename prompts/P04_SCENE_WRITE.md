@@ -73,6 +73,14 @@ still hold. Write them as they stand here, not as they began.
 RELEVANT RULES AND EARLIER EVENTS
 {{relevant_facts}}
 
+MEMORY CLOSEST TO THIS SCENE
+Retrieved by meaning from the book's own memory — earlier prose, character cards,
+world rules, recorded events — because it reads as related to what this scene does.
+It is context, not instruction: where it disagrees with the scene plan or the
+confirmed state above, those win. Use it to stay consistent with what the book has
+already established rather than inventing a second version of it.
+{{relevant_memory}}
+
 EXACT EXCERPTS FOR RETURNING TO DETAILS
 Each excerpt is the earlier paragraph itself, under its reference. When this
 scene returns to one, return to what it actually says — the same object, the

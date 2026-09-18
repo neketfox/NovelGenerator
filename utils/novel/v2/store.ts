@@ -32,6 +32,11 @@ export interface RunLogEntry {
 }
 
 export interface ProjectStore {
+  /**
+   * The slot this book lives in (data/<projectId>/), when it has one. The semantic index is
+   * keyed by it; an in-memory store has none and simply goes unindexed.
+   */
+  readonly projectId?: string;
   saveInput(input: ProjectInput): void;
   loadInput(): ProjectInput | null;
   saveDesign(design: BookDesign): void;

@@ -445,6 +445,10 @@ export function buildSceneContext(
       character_knowledge_and_beliefs: JSON.stringify(knowledge),
       participant_relationships: describeRelations(relationsFor(state, scene.participants || [])),
       relevant_facts: JSON.stringify(relevantFacts),
+      // Filled by the pipeline just before the scene is written, when the semantic index can
+      // be asked (lib/rag/storeIndex.ts). Context building is synchronous and must not wait on
+      // a model, so the default stands whenever retrieval is unavailable.
+      relevant_memory: '(nothing retrieved)',
       source_excerpts: JSON.stringify(sourceExcerpts.length ? sourceExcerpts : (scene.required_source_refs || [])),
       previous_scene_tail: previousTail || '(scene opens the chapter)',
       target_words: String(scene.target_words || 800),
