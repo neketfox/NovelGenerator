@@ -6,12 +6,16 @@ import { budgetFor, Orchestrator, type ProgressStage } from '../utils/novel/v2/o
 import { ChapterPipelineV2 } from '../utils/novel/v2/pipeline';
 import { downloadJson, restoreSnapshot, snapshotProject } from '../utils/novel/v2/export';
 import { PersistentProjectStore } from '../utils/novel/v2/persistent';
+import { slugifyProjectName } from '../services/projectSlots';
 import type { ProjectInput } from '../utils/novel/v2/types';
 import { playSuccessSound } from '../utils/soundUtils';
 
+// narrativeVoice and writingStyle are deliberately absent: the form seeds them in the
+// interface language (see UserInput.tsx), so a Ukrainian session does not start from English
+// craft notes. Dialogue-driven alternating POV is the default format this studio writes in.
 const DEFAULT_SETTINGS: StorySettings = {
-  genre: 'fantasy', narrativeVoice: 'third-limited', tone: 'serious', targetAudience: 'adult',
-  writingStyle: 'descriptive', tense: 'past',
+  genre: 'romance', tone: 'serious', targetAudience: 'adult',
+  tense: 'past', dialogueHeavyPov: true,
   ending: 'closed', targetWordsPerChapterMin: 3000, targetWordsPerChapterMax: 5000,
 };
 
@@ -69,8 +73,14 @@ export function splitError(message: string): { headline: string; detail: string 
   return { headline, detail };
 }
 
-/** React presents snapshots; the v2 store owns execution state. */
-export default function useBookGenerator() {
+/**
+ * React presents snapshots; the v2 store owns execution state.
+ *
+ * `projectId` names the slot on disk (data/<id>/snapshot.json). A book being created from the
+ * wizard has no slot until generation starts, which is when one is minted and the caller is
+ * told about it through `onProjectCreated` so the route can move to /project/<id>.
+ */
+export default function useBookGenerator(projectId?: string, onProjectCreated?: (id: string) => void) {
   const [storyPremise, setStoryPremise] = useState('');
   const [numChapters, setNumChapters] = useState(3);
   const [storySettings, setStorySettings] = useState<StorySettings>(DEFAULT_SETTINGS);
@@ -221,7 +231,14 @@ export default function useBookGenerator() {
   // instead of a blank form.
   useEffect(() => {
     let live = true;
-    PersistentProjectStore.open().then(store => {
+    // No slot yet: this is the creation form, and nothing is stored until generation starts.
+    if (!projectId) {
+      storeRef.current = null;
+      setStoreReady(true);
+      return () => { live = false; };
+    }
+    setStoreReady(false);
+    PersistentProjectStore.open(projectId).then(store => {
       if (!live) return;
       storeRef.current = store;
       const input = store.loadInput();
@@ -238,10 +255,17 @@ export default function useBookGenerator() {
     });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [projectId]);
 
   async function startGeneration(premise: string, count: number) {
-    if (busy.current || !storeRef.current) return;
+    if (busy.current) return;
+    // Started from the creation form: mint the slot now, so the book exists on disk (and in
+    // the URL) from its first chapter — a closed browser reopens it instead of losing it.
+    if (!storeRef.current) {
+      const id = slugifyProjectName(premise);
+      storeRef.current = await PersistentProjectStore.open(id);
+      onProjectCreated?.(id);
+    }
     getStore().clearAll();
     // A range rather than one fixed number: read as an average for the book's total word
     // budget, and also handed to the model as an explicit instruction so chapters are written
@@ -274,6 +298,21 @@ export default function useBookGenerator() {
     setStoryPremise(premise);
     setNumChapters(count);
     await run(input, true);
+  }
+
+  /**
+   * Stop after the call in flight without losing the book: bumping the epoch makes the run's
+   * own guard abandon it silently (the error path is epoch-guarded too), and everything
+   * already written stays in the slot. Resuming is the same `continueGeneration` an
+   * interrupted book already uses, so pause/resume and reload/resume are one mechanism.
+   */
+  function pauseGeneration() {
+    if (!busy.current) return;
+    epoch.current++;
+    busy.current = false;
+    setIsLoading(false);
+    setCurrentStep(GenerationStep.Idle);
+    refreshFromStore();
   }
 
   async function continueGeneration() {
@@ -355,7 +394,7 @@ export default function useBookGenerator() {
     isLoading, currentStep, error,
     isResumable: hasUnfinished && !isLoading,
     storeReady, exportProject, importProject,
-    startGeneration, continueGeneration, resetGenerator, editSettings,
+    startGeneration, continueGeneration, pauseGeneration, resetGenerator, editSettings,
     finalBookContent,
     finalMetadataJson,
     generatedChapters,

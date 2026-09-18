@@ -62,7 +62,6 @@
   "export.docx.hint": "Титульна сторінка з вашою обкладинкою, відформатовані розділи",
   "export.pdf.label": "PDF (.pdf)",
   "export.pdf.hint": "Титульна сторінка з вашою обкладинкою, відформатовані розділи",
-
   "wizard.app.exportProject": "Експорт проєкту",
   "wizard.app.exportProjectTitle": "Завантажити весь слот проєкту (§10): дизайн, плани, сцени, пам'ять, рукопис, звіт",
   "wizard.app.importProject": "Імпорт проєкту",
@@ -87,7 +86,6 @@
   "wizard.app.openInStudio": "Відкрити в Студії →",
   "wizard.app.moreActions": "Інші дії",
   "wizard.app.exportAs": "Експорт як…",
-
   "wizard.userInput.minChaptersAlert": "Вкажіть не менше {{minChapters}} розділів.",
   "wizard.userInput.aiProviderHeading": "Провайдер ШІ",
   "wizard.userInput.aiProviderDescription": "Оберіть провайдера інференсу: Gemini або Ollama",
@@ -154,7 +152,6 @@
   "wizard.userInput.processContinuityDesc": "Прийняті уривки закріплюють факти історії, і кожна наступна сцена пишеться з їх урахуванням. Проблеми ловляться ще в плані, до появи тексту; готовий розділ більше не відкривається.",
   "wizard.userInput.processAuditTitle": "04. Перевірка та експорт",
   "wizard.userInput.processAuditDesc": "Готова книга ще раз звіряється з власним задумом, і результати перевірок зберігаються разом із нею. Завантажте рукопис або весь проєкт цілком — з планами, пам'яттю і журналом запуску.",
-
   "wizard.bookDisplay.title": "Генерацію завершено",
   "wizard.bookDisplay.tabBook": "Текст книги",
   "wizard.bookDisplay.tabTimeline": "Хронологія",
@@ -173,7 +170,6 @@
   "wizard.bookDisplay.downloadJson": "Завантажити .json",
   "wizard.bookDisplay.startNewBook": "Почати нову книгу",
   "wizard.bookDisplay.copyFailedAlert": "Не вдалося скопіювати текст. Спробуйте вручну.",
-
   "wizard.saveBook.formatLabel": "Формат збереження",
   "wizard.saveBook.formatEpub": "EPUB",
   "wizard.saveBook.formatPdf": "PDF",
@@ -184,9 +180,9 @@
   "wizard.saveBook.saveDraft": "Зберегти чернетку",
   "wizard.saveBook.saveBook": "Зберегти книгу",
   "wizard.saveBook.draftNote": "Поточні розділи · не пройшли повну перевірку",
-
   "wizard.threeZone.generating": "Генерація",
   "wizard.threeZone.resumeGeneration": "Продовжити генерацію",
+  "wizard.threeZone.pauseGeneration": "Пауза",
   "wizard.threeZone.cleanSlate": "Почати з чистого аркуша",
   "wizard.threeZone.cleanSlateTitle": "Стерти весь тимчасовий стан генерації і почати заново",
   "wizard.threeZone.chaptersHeading": "Розділи",
@@ -219,7 +215,6 @@
   "wizard.threeZone.awaitingTelemetry": "Очікуємо телеметрію агентів...",
   "wizard.threeZone.chapterHeadingWithTitle": "Розділ {{num}}: {{title}}",
   "wizard.threeZone.chapterHeadingNoTitle": "Розділ {{num}}",
-
   "wizard.planView.labelTitle": "Назва",
   "wizard.planView.labelSummary": "Резюме",
   "wizard.planView.labelSceneBreakdown": "Сцени",
@@ -247,7 +242,6 @@
   "wizard.planView.sceneCarriedBy": "Хто веде",
   "wizard.planView.showFullPlan": "Показати план повністю (ще {{hidden}})",
   "wizard.planView.showLess": "Згорнути",
-
   "wizard.chapterChecks.heading": "Перевірки",
   "wizard.chapterChecks.chapterHash": "Розд. №{{num}}",
   "wizard.chapterChecks.originality": "Оригінальність",
@@ -259,7 +253,6 @@
   "wizard.chapterChecks.drifted": "змістився {{from}}→{{to}} сл.",
   "wizard.chapterChecks.held": "тримається ~{{value}} сл.",
   "wizard.chapterChecks.awaitingProse": "Очікуємо текст...",
-
   "wizard.bookStatistics.totalWords": "Усього слів",
   "wizard.bookStatistics.charactersCount": "{{count}} символів",
   "wizard.bookStatistics.readingTime": "Час читання",
@@ -270,7 +263,6 @@
   "wizard.bookStatistics.ofContent": "від тексту",
   "wizard.bookStatistics.minutesShort": "{{minutes}} хв",
   "wizard.bookStatistics.hoursMinutes": "{{hours}} год {{mins}} хв",
-
   "wizard.systemManual.title": "Архітектура та системний посібник NovelGenerator",
   "wizard.systemManual.subtitle": "Як книга планується, пишеться, перевіряється й фіксується — і що працює локально на вашій машині",
   "wizard.systemManual.closeTitle": "Закрити (Esc)",
@@ -339,5 +331,9 @@
   "wizard.systemManual.footerTagline": "NovelGenerator · Автономна система генерації романів",
   "wizard.systemManual.gotIt": "Зрозуміло",
   "wizard.systemManual.toggleTitle": "Посібник з архітектури та документації системи",
-  "wizard.systemManual.toggleAriaLabel": "Відкрити посібник з архітектури системи"
+  "wizard.systemManual.toggleAriaLabel": "Відкрити посібник з архітектури системи",
+  "wizard.userInput.defaultNarrativeVoice": "Від третьої особи, обмежена перспектива, один POV на сцену/розділ",
+  "wizard.userInput.defaultWritingStyle": "Сучасний романтичний стиль, живі та природні діалоги, емоційна напруга, сильна хімія між героями, багато діалогів і сцен взаємодії. Легкий гумор, внутрішні думки героя, помірні описи без перевантаження. Динамічний темп, емоційні реакції та поступовий розвиток стосунків.",
+  "usage.promptTokens": "Токени запиту",
+  "usage.completionTokens": "Токени відповіді"
 }

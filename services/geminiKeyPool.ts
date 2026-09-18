@@ -50,7 +50,10 @@ async function load(): Promise<void> {
   }
 }
 
-const ready: Promise<void> = typeof window !== 'undefined' ? load() : Promise.resolve();
+// Keyed on fetch rather than on window: the pool lives behind the dev server's API, which is
+// reachable from any runtime that can make a request — a terminal run (scripts/run-book.ts)
+// should use the author's configured keys too, not only a browser tab.
+const ready: Promise<void> = typeof fetch !== 'undefined' ? load() : Promise.resolve();
 
 function persist(): void {
   void fetch('/api/secrets', {

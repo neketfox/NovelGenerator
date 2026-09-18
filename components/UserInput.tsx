@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useI18n } from '../i18n';
 import { Button } from './common/Button';
 import { TextArea } from './common/TextArea';
@@ -52,6 +52,19 @@ const UserInput: React.FC<UserInputProps> = ({
     () => !!storySettings.storyLanguage && !['Ukrainian', 'Russian'].includes(storySettings.storyLanguage),
   );
   const [toneIsCustom, setToneIsCustom] = useState(() => !!storySettings.tone && !TONE_PRESETS.includes(storySettings.tone));
+
+  // The craft defaults are written in the interface language rather than shipped as English
+  // constants, so a Ukrainian session starts from Ukrainian notes. Only fills what is still
+  // empty: once the author has written their own, switching language never overwrites it.
+  useEffect(() => {
+    if (storySettings.narrativeVoice && storySettings.writingStyle) return;
+    setStorySettings({
+      ...storySettings,
+      narrativeVoice: storySettings.narrativeVoice || t('wizard.userInput.defaultNarrativeVoice'),
+      writingStyle: storySettings.writingStyle || t('wizard.userInput.defaultWritingStyle'),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
   // The model fields show gemini-3.6-flash explicitly rather than leaving them blank with a
   // placeholder — same resolved model either way (an absent geminiModel already means "use the
   // default"), just visible instead of implied.

@@ -62,7 +62,6 @@
   "export.docx.hint": "Титульная страница с вашей обложкой, отформатированные главы",
   "export.pdf.label": "PDF (.pdf)",
   "export.pdf.hint": "Титульная страница с вашей обложкой, отформатированные главы",
-
   "wizard.app.exportProject": "Экспорт проекта",
   "wizard.app.exportProjectTitle": "Скачать весь слот проекта (§10): дизайн, планы, сцены, память, рукопись, отчёт",
   "wizard.app.importProject": "Импорт проекта",
@@ -87,7 +86,6 @@
   "wizard.app.openInStudio": "Открыть в Студии →",
   "wizard.app.moreActions": "Другие действия",
   "wizard.app.exportAs": "Экспорт как…",
-
   "wizard.userInput.minChaptersAlert": "Укажите не менее {{minChapters}} глав.",
   "wizard.userInput.aiProviderHeading": "Провайдер ИИ",
   "wizard.userInput.aiProviderDescription": "Выберите провайдера инференса: Gemini или Ollama",
@@ -154,7 +152,6 @@
   "wizard.userInput.processContinuityDesc": "Принятые отрывки закрепляют факты истории, и каждая следующая сцена пишется с их учётом. Проблемы ловятся ещё в плане, до появления текста; готовая глава больше не открывается.",
   "wizard.userInput.processAuditTitle": "04. Проверка и экспорт",
   "wizard.userInput.processAuditDesc": "Готовая книга ещё раз сверяется с собственным замыслом, и результаты проверок сохраняются вместе с ней. Скачайте рукопись или весь проект целиком — с планами, памятью и журналом запуска.",
-
   "wizard.bookDisplay.title": "Генерация завершена",
   "wizard.bookDisplay.tabBook": "Текст книги",
   "wizard.bookDisplay.tabTimeline": "Хронология",
@@ -173,7 +170,6 @@
   "wizard.bookDisplay.downloadJson": "Скачать .json",
   "wizard.bookDisplay.startNewBook": "Начать новую книгу",
   "wizard.bookDisplay.copyFailedAlert": "Не удалось скопировать текст. Попробуйте вручную.",
-
   "wizard.saveBook.formatLabel": "Формат сохранения",
   "wizard.saveBook.formatEpub": "EPUB",
   "wizard.saveBook.formatPdf": "PDF",
@@ -184,9 +180,9 @@
   "wizard.saveBook.saveDraft": "Сохранить черновик",
   "wizard.saveBook.saveBook": "Сохранить книгу",
   "wizard.saveBook.draftNote": "Текущие главы · не прошли полную проверку",
-
   "wizard.threeZone.generating": "Генерация",
   "wizard.threeZone.resumeGeneration": "Продолжить генерацию",
+  "wizard.threeZone.pauseGeneration": "Пауза",
   "wizard.threeZone.cleanSlate": "Начать с чистого листа",
   "wizard.threeZone.cleanSlateTitle": "Стереть всё временное состояние генерации и начать заново",
   "wizard.threeZone.chaptersHeading": "Главы",
@@ -219,7 +215,6 @@
   "wizard.threeZone.awaitingTelemetry": "Ожидаем телеметрию агентов...",
   "wizard.threeZone.chapterHeadingWithTitle": "Глава {{num}}: {{title}}",
   "wizard.threeZone.chapterHeadingNoTitle": "Глава {{num}}",
-
   "wizard.planView.labelTitle": "Название",
   "wizard.planView.labelSummary": "Резюме",
   "wizard.planView.labelSceneBreakdown": "Сцены",
@@ -247,7 +242,6 @@
   "wizard.planView.sceneCarriedBy": "Кто ведёт",
   "wizard.planView.showFullPlan": "Показать план целиком (ещё {{hidden}})",
   "wizard.planView.showLess": "Свернуть",
-
   "wizard.chapterChecks.heading": "Проверки",
   "wizard.chapterChecks.chapterHash": "Гл. №{{num}}",
   "wizard.chapterChecks.originality": "Оригинальность",
@@ -259,7 +253,6 @@
   "wizard.chapterChecks.drifted": "сместился {{from}}→{{to}} сл.",
   "wizard.chapterChecks.held": "держится ~{{value}} сл.",
   "wizard.chapterChecks.awaitingProse": "Ожидаем текст...",
-
   "wizard.bookStatistics.totalWords": "Всего слов",
   "wizard.bookStatistics.charactersCount": "{{count}} символов",
   "wizard.bookStatistics.readingTime": "Время чтения",
@@ -270,7 +263,6 @@
   "wizard.bookStatistics.ofContent": "от текста",
   "wizard.bookStatistics.minutesShort": "{{minutes}} мин",
   "wizard.bookStatistics.hoursMinutes": "{{hours}} ч {{mins}} мин",
-
   "wizard.systemManual.title": "Архитектура и системное руководство NovelGenerator",
   "wizard.systemManual.subtitle": "Как книга планируется, пишется, проверяется и фиксируется — и что работает локально на вашей машине",
   "wizard.systemManual.closeTitle": "Закрыть (Esc)",
@@ -339,5 +331,9 @@
   "wizard.systemManual.footerTagline": "NovelGenerator · Автономная система генерации романов",
   "wizard.systemManual.gotIt": "Понятно",
   "wizard.systemManual.toggleTitle": "Руководство по архитектуре и документации системы",
-  "wizard.systemManual.toggleAriaLabel": "Открыть руководство по архитектуре системы"
+  "wizard.systemManual.toggleAriaLabel": "Открыть руководство по архитектуре системы",
+  "wizard.userInput.defaultNarrativeVoice": "От третьего лица, ограниченная перспектива, один POV на сцену/главу",
+  "wizard.userInput.defaultWritingStyle": "Современный романтический стиль, живые и естественные диалоги, эмоциональное напряжение, сильная химия между героями, много диалогов и сцен взаимодействия. Лёгкий юмор, внутренние мысли героя, умеренные описания без перегруза. Динамичный темп, эмоциональные реакции и постепенное развитие отношений.",
+  "usage.promptTokens": "Токены запроса",
+  "usage.completionTokens": "Токены ответа"
 }

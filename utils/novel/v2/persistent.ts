@@ -1,5 +1,5 @@
 import { restoreSnapshot, snapshotProject } from './export';
-import { idbDel, idbGet, idbSet } from './idb';
+import { deleteSlot, loadSlot, saveSlot } from '../../../services/projectSlots';
 import { BrowserProjectStore, MemoryProjectStore, type SceneRecord } from './store';
 import type {
   BookDesign,
@@ -12,18 +12,26 @@ import type {
 } from './types';
 
 /**
- * The durable project slot: memory stays the synchronous source of truth for
- * the orchestrator, and every mutation schedules a debounced snapshot write
- * to IndexedDB. On open, the snapshot returns; a localStorage-only book from
- * the previous version migrates forward once and the old keys go away.
+ * One durable project slot, stored as a file: memory stays the synchronous source of truth
+ * for the orchestrator, and every mutation schedules a debounced snapshot write to
+ * data/<projectId>/snapshot.json (services/projectSlots.ts). Each book is its own slot, so
+ * opening one from the dashboard resumes exactly where it stopped — no browser storage is
+ * involved at all. A localStorage-only book from the version before slots existed migrates
+ * forward once and the old keys go away.
  */
 export class PersistentProjectStore extends MemoryProjectStore {
-  private static readonly KEY = 'project';
+  /** The slot this store reads and writes — its directory name under data/. */
+  readonly projectId: string;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
-  static async open(): Promise<PersistentProjectStore> {
-    const store = new PersistentProjectStore();
-    const snap = await idbGet(PersistentProjectStore.KEY);
+  private constructor(projectId: string) {
+    super();
+    this.projectId = projectId;
+  }
+
+  static async open(projectId: string): Promise<PersistentProjectStore> {
+    const store = new PersistentProjectStore(projectId);
+    const snap = await loadSlot(projectId);
     if (snap && typeof snap === 'object') {
       try {
         restoreSnapshot(store, snap);
@@ -61,7 +69,7 @@ export class PersistentProjectStore extends MemoryProjectStore {
       this.timer = null;
     }
     try {
-      await idbSet(PersistentProjectStore.KEY, snapshotProject(this));
+      await saveSlot(this.projectId, snapshotProject(this));
     } catch {
       // The run continues in memory; the next mutation retries the write.
     }
@@ -86,6 +94,6 @@ export class PersistentProjectStore extends MemoryProjectStore {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    idbDel(PersistentProjectStore.KEY).catch(() => undefined);
+    deleteSlot(this.projectId).catch(() => undefined);
   }
 }

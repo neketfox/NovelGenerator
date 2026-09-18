@@ -62,7 +62,6 @@
   "export.docx.hint": "Cover page with your cover image, formatted chapters",
   "export.pdf.label": "PDF (.pdf)",
   "export.pdf.hint": "Cover page with your cover image, formatted chapters",
-
   "wizard.app.exportProject": "Export project",
   "wizard.app.exportProjectTitle": "Download the whole project slot (§10): design, plans, scenes, memory, manuscript, report",
   "wizard.app.importProject": "Import project",
@@ -87,7 +86,6 @@
   "wizard.app.openInStudio": "Open in Studio →",
   "wizard.app.moreActions": "More actions",
   "wizard.app.exportAs": "Export as…",
-
   "wizard.userInput.minChaptersAlert": "Please enter at least {{minChapters}} chapters.",
   "wizard.userInput.aiProviderHeading": "AI provider",
   "wizard.userInput.aiProviderDescription": "Choose inference provider: Gemini or Ollama",
@@ -154,7 +152,6 @@
   "wizard.userInput.processContinuityDesc": "Accepted passages establish the story’s facts, and every later scene is written against them. Problems are caught in the plan, before the prose exists; a finished chapter is never reopened.",
   "wizard.userInput.processAuditTitle": "04. Audit & export",
   "wizard.userInput.processAuditDesc": "The finished book is read once more against its own design, and what the checks found travels with it. Download the manuscript, or the whole project with its plans, memory and run log.",
-
   "wizard.bookDisplay.title": "Generation Complete",
   "wizard.bookDisplay.tabBook": "Book Content",
   "wizard.bookDisplay.tabTimeline": "Timeline",
@@ -173,7 +170,6 @@
   "wizard.bookDisplay.downloadJson": "Download .json",
   "wizard.bookDisplay.startNewBook": "Start New Book",
   "wizard.bookDisplay.copyFailedAlert": "Failed to copy text. Please try manually.",
-
   "wizard.saveBook.formatLabel": "Save format",
   "wizard.saveBook.formatEpub": "EPUB",
   "wizard.saveBook.formatPdf": "PDF",
@@ -184,9 +180,9 @@
   "wizard.saveBook.saveDraft": "Save draft",
   "wizard.saveBook.saveBook": "Save book",
   "wizard.saveBook.draftNote": "Current chapters · not fully reviewed",
-
   "wizard.threeZone.generating": "Generating",
   "wizard.threeZone.resumeGeneration": "Resume Generation",
+  "wizard.threeZone.pauseGeneration": "Pause",
   "wizard.threeZone.cleanSlate": "Clean Slate",
   "wizard.threeZone.cleanSlateTitle": "Wipe all temporary generation state and start from clean slate",
   "wizard.threeZone.chaptersHeading": "Chapters",
@@ -219,7 +215,6 @@
   "wizard.threeZone.awaitingTelemetry": "Awaiting agent telemetry...",
   "wizard.threeZone.chapterHeadingWithTitle": "Chapter {{num}}: {{title}}",
   "wizard.threeZone.chapterHeadingNoTitle": "Chapter {{num}}",
-
   "wizard.planView.labelTitle": "Title",
   "wizard.planView.labelSummary": "Summary",
   "wizard.planView.labelSceneBreakdown": "Scenes",
@@ -247,7 +242,6 @@
   "wizard.planView.sceneCarriedBy": "Carried by",
   "wizard.planView.showFullPlan": "Show full plan ({{hidden}} more)",
   "wizard.planView.showLess": "Show less",
-
   "wizard.chapterChecks.heading": "Checks",
   "wizard.chapterChecks.chapterHash": "Ch #{{num}}",
   "wizard.chapterChecks.originality": "Originality",
@@ -259,7 +253,6 @@
   "wizard.chapterChecks.drifted": "drifted {{from}}→{{to}}w",
   "wizard.chapterChecks.held": "held ~{{value}}w",
   "wizard.chapterChecks.awaitingProse": "Awaiting prose...",
-
   "wizard.bookStatistics.totalWords": "Total Words",
   "wizard.bookStatistics.charactersCount": "{{count}} characters",
   "wizard.bookStatistics.readingTime": "Reading Time",
@@ -270,7 +263,6 @@
   "wizard.bookStatistics.ofContent": "of content",
   "wizard.bookStatistics.minutesShort": "{{minutes}} min",
   "wizard.bookStatistics.hoursMinutes": "{{hours}}h {{mins}}m",
-
   "wizard.systemManual.title": "NovelGenerator Architecture & System Guide",
   "wizard.systemManual.subtitle": "How a book is planned, written, checked and recorded — and what runs locally on your machine",
   "wizard.systemManual.closeTitle": "Close (Esc)",
@@ -339,5 +331,9 @@
   "wizard.systemManual.footerTagline": "NovelGenerator · Autonomous Novel Generation System",
   "wizard.systemManual.gotIt": "Got it",
   "wizard.systemManual.toggleTitle": "System Architecture & Documentation Guide",
-  "wizard.systemManual.toggleAriaLabel": "Open System Architecture Guide"
+  "wizard.systemManual.toggleAriaLabel": "Open System Architecture Guide",
+  "wizard.userInput.defaultNarrativeVoice": "Third person limited, one POV per scene/chapter",
+  "wizard.userInput.defaultWritingStyle": "Contemporary romance style: lively, natural dialogue, emotional tension, strong chemistry between the leads, plenty of dialogue and interaction scenes. Light humour, the POV character's inner thoughts, moderate description without overloading. Brisk pacing, emotional reactions, and a relationship that develops step by step.",
+  "usage.promptTokens": "Prompt tokens",
+  "usage.completionTokens": "Completion tokens"
 }

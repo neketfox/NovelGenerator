@@ -27,6 +27,7 @@ export interface ThreeZoneGenerationViewProps {
   isResumable?: boolean;
   isLoading?: boolean;
   onResumeGeneration?: () => void;
+  onPauseGeneration?: () => void;
   /** The studio puts the wordmark and the global reset on the same strip as the run status. */
   version?: string;
   onReset?: () => void;
@@ -48,6 +49,7 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
   isResumable = false,
   isLoading = false,
   onResumeGeneration,
+  onPauseGeneration,
 }) => {
   const { t } = useI18n();
   // Track selected chapter for viewing (defaults to active processing chapter)
@@ -128,6 +130,14 @@ export const ThreeZoneGenerationView: React.FC<ThreeZoneGenerationViewProps> = (
               <span>{t('wizard.threeZone.generating')}</span>
               <RunClock agentLogs={agentLogs} isLoading={isLoading} />
             </div>
+          )}
+          {/* Pause and resume are the same control in two states: pausing abandons the call in
+              flight and leaves the book in its slot, resuming is the very mechanism an
+              interrupted book already uses to continue. */}
+          {isLoading && onPauseGeneration && (
+            <Button onClick={onPauseGeneration} variant="secondary" className="text-xs py-1 px-2.5">
+              {t('wizard.threeZone.pauseGeneration')}
+            </Button>
           )}
           {isResumable && !isLoading && onResumeGeneration && (
             <Button onClick={onResumeGeneration} variant="primary" className="text-xs py-1 px-2.5">

@@ -90,7 +90,7 @@ describe('persistent store', () => {
       data.set('ngv2.input', JSON.stringify(input));
       data.set('ngv2.design', JSON.stringify(design()));
       data.set('ngv2.manuscript', JSON.stringify([{ chapter: 1, text: 'Aren climbed.' }]));
-      const store = await PersistentProjectStore.open();
+      const store = await PersistentProjectStore.open('legacy-migration');
       expect(store.loadInput()?.premise).toBe(input.premise);
       expect(store.manuscript()).toEqual([{ chapter: 1, text: 'Aren climbed.' }]);
       // Legacy keys go away once the book lives in the new slot.

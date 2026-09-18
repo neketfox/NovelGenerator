@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { I18nProvider, useI18n } from './i18n';
 import Bookshelf from './components/dashboard/Bookshelf';
-import ProjectWorkspace from './components/editor/ProjectWorkspace';
 import LanguageSelector from './components/common/LanguageSelector';
 import ApiKeyManagerModal from './components/common/ApiKeyManagerModal';
 import UsageWidget from './components/usage/UsageWidget';
@@ -33,23 +32,23 @@ const StudioHeader: React.FC = () => {
 };
 
 /**
- * The wizard route (/project/new) renders the pre-existing App, which already has its own
- * header (title, theme toggle, export/import/reset) — stacking the Studio header on top of it
- * was a duplicate-header bug. The Studio header (usage, key manager, language) only makes
- * sense once a project exists, so it's shown on the dashboard and the project workspace only.
+ * A book is always the generator's own page (App → ThreeZoneGenerationView): /project/new is
+ * that page with an empty slot showing its creation form, and /project/:id is the same page
+ * bound to a slot on disk. There is no second editor — the box's page is the editor, and it
+ * carries its own header, so the Studio header only appears on the dashboard.
  */
 const Shell: React.FC = () => {
   const location = useLocation();
-  const isWizard = location.pathname === '/project/new';
+  const isProjectPage = location.pathname.startsWith('/project/');
   return (
     <div className="min-h-screen flex flex-col">
       <RateLimitBanner />
-      {!isWizard && <StudioHeader />}
+      {!isProjectPage && <StudioHeader />}
       <div className="flex-1">
         <Routes>
           <Route path="/" element={<Bookshelf />} />
           <Route path="/project/new" element={<App />} />
-          <Route path="/project/:id" element={<ProjectWorkspace />} />
+          <Route path="/project/:id" element={<App />} />
         </Routes>
       </div>
     </div>

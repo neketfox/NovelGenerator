@@ -32,6 +32,36 @@ function ragDir(id: string): string {
 function ragFile(id: string, refId: string): string {
   return path.join(ragDir(id), `${safe(refId)}.json`);
 }
+/**
+ * The generator's own project snapshot (utils/novel/v2/export.ts) — the format the box
+ * already uses for export/import and for resuming an unfinished book. Storing it per project
+ * here is what makes a book survive a browser restart without any browser storage at all.
+ */
+function snapshotFile(id: string): string {
+  return path.join(projectDir(id), 'snapshot.json');
+}
+
+/** The card the dashboard shows, derived server-side so listing never ships whole manuscripts. */
+function slotSummary(id: string): Record<string, unknown> | null {
+  const snapshot = readJson(snapshotFile(id)) as
+    | { exportedAt?: string; files?: { input?: { premise?: string; chapter_count?: number; genre?: string }; book_design?: { contract?: { working_title?: string } }; manuscript?: { chapter: number }[] } }
+    | null;
+  if (!snapshot?.files) return null;
+  const { input, book_design: design, manuscript } = snapshot.files;
+  const written = Array.isArray(manuscript) ? manuscript.length : 0;
+  const total = input?.chapter_count ?? 0;
+  return {
+    id,
+    title: design?.contract?.working_title || input?.premise?.slice(0, 60) || id,
+    premise: input?.premise ?? '',
+    genre: input?.genre ?? '',
+    chaptersWritten: written,
+    chapterCount: total,
+    /** Started but not finished — the "unfinished book" card the dashboard offers to continue. */
+    unfinished: total > 0 && written > 0 && written < total,
+    updatedAt: snapshot.exportedAt ?? null,
+  };
+}
 
 function readJson(file: string): unknown {
   if (!fs.existsSync(file)) return null;
@@ -81,6 +111,41 @@ export function projectDataServerPlugin(): Plugin {
   return {
     name: 'project-data-server',
     configureServer(server) {
+      // The generator's own project slots: data/<id>/snapshot.json, in the box's existing
+      // snapshot format, so a book resumes from disk instead of from browser storage.
+      server.middlewares.use('/api/slots', async (req, res) => {
+        try {
+          fs.mkdirSync(DATA_DIR, { recursive: true });
+          const url = new URL(req.url ?? '/', 'http://localhost');
+          const [id] = url.pathname.split('/').filter(Boolean);
+
+          if (req.method === 'GET' && !id) {
+            const dirs = fs.existsSync(DATA_DIR)
+              ? fs.readdirSync(DATA_DIR, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== 'user')
+              : [];
+            const slots = dirs.map((d) => slotSummary(d.name)).filter(Boolean);
+            return sendJson(res, 200, { slots });
+          }
+          if (req.method === 'GET' && id) {
+            const snapshot = readJson(snapshotFile(id));
+            if (!snapshot) return sendJson(res, 404, { error: 'not found' });
+            return sendJson(res, 200, snapshot);
+          }
+          if (req.method === 'PUT' && id) {
+            writeJson(snapshotFile(id), JSON.parse(await readBody(req)));
+            return sendJson(res, 200, { ok: true });
+          }
+          if (req.method === 'DELETE' && id) {
+            const dir = projectDir(id);
+            if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+            return sendJson(res, 200, { ok: true });
+          }
+          sendJson(res, 404, { error: 'unsupported route' });
+        } catch (err) {
+          sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });
+        }
+      });
+
       server.middlewares.use('/api/projects', async (req, res) => {
         try {
           fs.mkdirSync(DATA_DIR, { recursive: true });

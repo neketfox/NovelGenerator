@@ -2,7 +2,7 @@
 
 
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useI18n } from './i18n';
 import useBookGenerator, { splitError } from './hooks/useBookGenerator';
 import { RunClock } from './components/RunClock';
@@ -17,25 +17,19 @@ import { LoadingSpinner } from './components/common/LoadingSpinner';
 import AgentActivityLog from './components/AgentActivityLog';
 import ThreeZoneGenerationView from './components/ThreeZoneGenerationView';
 import { installConsoleBridge, logToTerminal, watchMainThreadStalls } from './utils/terminalLogger';
-import SaveToBookshelf from './components/dashboard/SaveToBookshelf';
 import LanguageSelector from './components/common/LanguageSelector';
 import ApiKeyManagerModal from './components/common/ApiKeyManagerModal';
-import UsageWidget from './components/usage/UsageWidget';
+import UsageStatsModal from './components/usage/UsageStatsModal';
 import ExportAsModal from './components/common/ExportAsModal';
-import SaveBeforeLeaveModal from './components/common/SaveBeforeLeaveModal';
 import { chaptersToStudioProject } from './services/importFromGenerator';
-import { saveProjectFull } from './services/studioStore';
-import { indexProject } from './lib/rag';
 
 const App: React.FC = () => {
   const navigate = useNavigate();
+  const { id: routeProjectId } = useParams<{ id: string }>();
   const { t, language } = useI18n();
   const [showKeys, setShowKeys] = React.useState(false);
   const [showExportAs, setShowExportAs] = React.useState(false);
-  const [showLeaveModal, setShowLeaveModal] = React.useState(false);
-  const [saving, setSaving] = React.useState(false);
-  const [savedProjectId, setSavedProjectId] = React.useState<string | null>(null);
-  const savedProjectIdRef = React.useRef<string | null>(null);
+  const [showStats, setShowStats] = React.useState(false);
   const {
     storyPremise,
     setStoryPremise,
@@ -45,6 +39,7 @@ const App: React.FC = () => {
     setStorySettings,
     startGeneration,
     continueGeneration,
+    pauseGeneration,
     isLoading,
     currentStep,
     error,
@@ -63,7 +58,12 @@ const App: React.FC = () => {
     exportProject,
     importProject,
     storeReady,
-  } = useBookGenerator();
+  } = useBookGenerator(
+    routeProjectId,
+    // The book exists on disk from its first chapter: move the URL onto its slot so a closed
+    // browser (or a crash mid-run) reopens this very book instead of an empty form.
+    React.useCallback((id: string) => navigate(`/project/${id}`, { replace: true }), [navigate]),
+  );
 
   const hasConnectedRef = React.useRef(false);
   // What the application is doing, readable from outside a render. The stall watch reports the step a
@@ -101,8 +101,13 @@ const App: React.FC = () => {
     resetGenerator();
   };
 
-  const showProgress = (isLoading || isResumable) && 
-                       currentStep !== GenerationStep.Idle && 
+  // /project/new is the creation form; /project/:id is a book, and a book always opens on its
+  // own page — running, paused or waiting to be resumed — instead of throwing the author back
+  // at a form or an "unfinished book found" card (that card now lives on the dashboard).
+  const isCreating = !routeProjectId;
+  const hasStoredWork = generatedChapters.length > 0 || !!currentStoryOutline;
+
+  const showProgress = !isCreating && storeReady && (isLoading || hasStoredWork) &&
                        currentStep !== GenerationStep.Done &&
                        currentStep !== GenerationStep.Error &&
                        currentStep !== GenerationStep.WaitingForOutlineApproval &&
@@ -122,8 +127,9 @@ const App: React.FC = () => {
     <SaveBook draft content={'# Manuscript — Draft\n\n' + generatedChapters.map((chapter, index) => chapter.content.trim() ? `## Chapter ${index + 1}: ${chapter.title}\n\n${chapter.content}` : '').filter(Boolean).join('\n\n')} />
   ) : null;
 
-  // For "Export as…" (docx/pdf/json/markdown): built on the fly from the current draft, not
-  // persisted — Save (SaveToBookshelf) is the separate action that writes it to data/<id>/.
+  // Rendering only: the docx/pdf/markdown writers read this shape. Nothing is stored from it —
+  // the book itself already lives in its slot (data/<id>/snapshot.json), written by the store
+  // on every mutation, so there is no separate "save to the shelf" step to perform.
   const exportAsProject = React.useMemo(
     () => chaptersToStudioProject(
       storyPremise.slice(0, 80) || 'Untitled Book',
@@ -136,37 +142,10 @@ const App: React.FC = () => {
   );
   const hasDraftContent = generatedChapters.some(chapter => chapter.content.trim());
 
-  // Shared between the header's Save button and the "save before leaving" prompt: creates the
-  // Studio project on first call and updates the same one (by id) on every call after.
-  const performSave = React.useCallback(async () => {
-    if (!hasDraftContent) return;
-    setSaving(true);
-    try {
-      const project = chaptersToStudioProject(
-        storyPremise.slice(0, 80) || 'Untitled Book',
-        storyPremise,
-        storySettings.genre ?? '',
-        language,
-        generatedChapters,
-      );
-      if (savedProjectIdRef.current) project.id = savedProjectIdRef.current;
-      savedProjectIdRef.current = project.id;
-      await saveProjectFull(project);
-      void indexProject(project);
-      setSavedProjectId(project.id);
-    } finally {
-      setSaving(false);
-    }
-  }, [hasDraftContent, storyPremise, storySettings.genre, language, generatedChapters]);
-
-  const goToDashboard = () => {
-    if (hasDraftContent) setShowLeaveModal(true);
-    else navigate('/');
-  };
+  const goToDashboard = () => navigate('/');
 
   const workInProgressActions = (
     <>
-      <SaveToBookshelf saving={saving} savedProjectId={savedProjectId} hasContent={hasDraftContent} onSave={() => void performSave()} />
       <button
         type="button"
         onClick={() => setShowExportAs(true)}
@@ -192,9 +171,14 @@ const App: React.FC = () => {
         <span className="font-mono text-xs text-zinc-500">v4.2</span>
       </div>
       <div className="flex items-center gap-3">
-        <div className="hidden lg:block">
-          <UsageWidget />
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowStats(true)}
+          title={t('usage.title')}
+          className="h-7 text-xs px-2.5 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-300 rounded transition-colors"
+        >
+          📊
+        </button>
         <ThemeToggle />
         <SystemManualToggle />
         <button
@@ -298,29 +282,18 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {currentStep === GenerationStep.Idle && !finalBookContent && isResumable && (
-          <div className="border border-zinc-800 rounded p-4 md:p-5 text-sm text-zinc-300">
-            <p className="font-medium">{t('wizard.app.unfinishedFound', { count: generatedChapters.length, total: totalChaptersToProcess })}</p>
-            <p className="text-xs text-zinc-500 mt-1">{t('wizard.app.unfinishedNote')}</p>
-            <div className="mt-3 flex gap-3">
-              <button onClick={handleContinue} disabled={isLoading} className="px-3 py-1 bg-zinc-200 text-zinc-900 rounded text-xs font-medium">{t('wizard.app.continueWriting')}</button>
-              <button onClick={handleReset} className="px-3 py-1 border border-zinc-700 rounded text-xs">{t('wizard.app.discardStartNew')}</button>
-            </div>
-          </div>
-        )}
-
         {currentStep === GenerationStep.Idle && !finalBookContent && !storeReady && (
           <p className="text-zinc-500 text-xs">{t('wizard.app.openingStorage')}</p>
         )}
 
-        {currentStep === GenerationStep.Idle && !finalBookContent && !isResumable && storeReady && (
+        {isCreating && currentStep === GenerationStep.Idle && !finalBookContent && storeReady && (
           <>
             <UserInput
               storyPremise={storyPremise}
               setStoryPremise={setStoryPremise}
               numChapters={numChapters}
               setNumChapters={setNumChapters}
-              genre={storySettings.genre || 'fantasy'}
+              genre={storySettings.genre || 'romance'}
               setGenre={(genre) => setStorySettings({ ...storySettings, genre })}
               storySettings={storySettings}
               setStorySettings={setStorySettings}
@@ -356,6 +329,7 @@ const App: React.FC = () => {
             isResumable={isResumable}
             isLoading={isLoading}
             onResumeGeneration={handleStartGeneration}
+            onPauseGeneration={pauseGeneration}
             headerActions={<>{saveControl}{workInProgressActions}</>}
             version="v4.2"
             onReset={handleReset}
@@ -396,17 +370,8 @@ const App: React.FC = () => {
       </footer>
 
       {showKeys && <ApiKeyManagerModal onClose={() => setShowKeys(false)} />}
+      {showStats && <UsageStatsModal onClose={() => setShowStats(false)} />}
       {showExportAs && <ExportAsModal project={exportAsProject} onClose={() => setShowExportAs(false)} />}
-      {showLeaveModal && (
-        <SaveBeforeLeaveModal
-          saving={saving}
-          onCancel={() => setShowLeaveModal(false)}
-          onLeaveWithoutSaving={() => { setShowLeaveModal(false); navigate('/'); }}
-          onSaveAndLeave={() => {
-            void performSave().then(() => { setShowLeaveModal(false); navigate('/'); });
-          }}
-        />
-      )}
     </div>
   );
 };
