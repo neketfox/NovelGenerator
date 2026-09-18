@@ -5,10 +5,15 @@
 
 import { LLMProviderConfig } from '../types';
 import { generateGeminiText, generateGeminiTextStream } from './geminiService';
-import { generateOllamaText, generateOllamaTextStream, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_OLLAMA_MODEL } from './ollamaService';
+import { generateOllamaText, generateOllamaTextStream, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_OLLAMA_MODEL, type OllamaUsage } from './ollamaService';
 import { logToTerminal } from '../utils/terminalLogger';
+import { recordUsage } from './usageTracker';
 
-const LLM_STORAGE_KEY = 'novelGenerator_llm_config';
+// Ollama has no key pool (no keyId), but the statistics panel should count its tokens the same
+// way it counts Gemini's — the panel does not otherwise know the run switched provider.
+function trackOllamaUsage(usage: OllamaUsage): void {
+  recordUsage({ timestamp: Date.now(), promptTokens: usage.promptTokens, completionTokens: usage.completionTokens });
+}
 
 export const DEFAULT_LLM_CONFIG: LLMProviderConfig = {
   provider: 'gemini',
@@ -16,66 +21,90 @@ export const DEFAULT_LLM_CONFIG: LLMProviderConfig = {
   ollamaModel: DEFAULT_OLLAMA_MODEL
 };
 
-export function getStoredProviderConfig(): LLMProviderConfig {
-  if (typeof window === 'undefined') return DEFAULT_LLM_CONFIG;
-  try {
-    const raw = localStorage.getItem(LLM_STORAGE_KEY);
-    if (!raw) return DEFAULT_LLM_CONFIG;
-    const parsed = JSON.parse(raw);
-    return {
-      provider: parsed.provider === 'ollama' ? 'ollama' : 'gemini',
-      ollamaEndpoint: parsed.ollamaEndpoint || DEFAULT_OLLAMA_ENDPOINT,
-      ollamaModel: parsed.ollamaModel || DEFAULT_OLLAMA_MODEL,
-      // Only present when the author typed one: stored configs keep their exact shape otherwise.
-      ...(typeof parsed.geminiModel === 'string' && parsed.geminiModel.trim() ? { geminiModel: parsed.geminiModel.trim() } : {}),
-    };
-  } catch {
-    return DEFAULT_LLM_CONFIG;
-  }
-}
-
-const VALIDATOR_STORAGE_KEY = 'novelGenerator_validator_config';
-
 /**
- * The editor model, when the author wants one distinct from the writer. Undefined means the writer
- * also judges its own prose, which is the weakest configuration and never the recommended one.
+ * Which model writes and which model reviews, kept in data/user/preferences.json beside the
+ * language and theme — the same place everything else about this installation lives. No
+ * browser storage: the choice belongs to the machine running the book, not to one tab.
+ *
+ * Reads are synchronous because every model call makes one, so the file is loaded once into
+ * this cache at startup and written through on each change. A call made in the first moments
+ * after boot, before the load resolves, sees the defaults — the same tradeoff the key pool
+ * makes, and generation never starts that early.
  */
-export function getStoredValidatorConfig(): LLMProviderConfig | undefined {
-  if (typeof window === 'undefined') return undefined;
+interface ProviderSettings {
+  writer: LLMProviderConfig;
+  /** Undefined means the writer judges its own prose, which is the weakest configuration. */
+  editor?: LLMProviderConfig & { enabled: boolean };
+}
+
+let settings: ProviderSettings = { writer: DEFAULT_LLM_CONFIG };
+
+function readProvider(raw: unknown, fallback: LLMProviderConfig): LLMProviderConfig {
+  const parsed = (raw ?? {}) as Record<string, unknown>;
+  return {
+    provider: parsed.provider === 'ollama' ? 'ollama' : 'gemini',
+    ollamaEndpoint: (parsed.ollamaEndpoint as string) || fallback.ollamaEndpoint,
+    ollamaModel: (parsed.ollamaModel as string) || fallback.ollamaModel,
+    ...(typeof parsed.think === 'boolean' ? { think: parsed.think } : {}),
+    // Only present when the author typed one: stored configs keep their exact shape otherwise.
+    ...(typeof parsed.geminiModel === 'string' && parsed.geminiModel.trim() ? { geminiModel: parsed.geminiModel.trim() } : {}),
+  };
+}
+
+async function loadProviderSettings(): Promise<void> {
   try {
-    const raw = localStorage.getItem(VALIDATOR_STORAGE_KEY);
-    if (!raw) return undefined;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.enabled === false) return undefined;
-    return {
-      provider: parsed.provider === 'ollama' ? 'ollama' : 'gemini',
-      ollamaEndpoint: parsed.ollamaEndpoint || DEFAULT_OLLAMA_ENDPOINT,
-      ollamaModel: parsed.ollamaModel || DEFAULT_OLLAMA_MODEL,
-      think: Boolean(parsed.think),
-      ...(typeof parsed.geminiModel === 'string' && parsed.geminiModel.trim() ? { geminiModel: parsed.geminiModel.trim() } : {}),
-    };
+    const response = await fetch('/api/preferences');
+    if (!response.ok) return;
+    const file = await response.json() as { writer?: unknown; editor?: unknown };
+    if (file.writer) settings.writer = readProvider(file.writer, DEFAULT_LLM_CONFIG);
+    const editor = file.editor as Record<string, unknown> | undefined;
+    if (editor && editor.enabled !== false) {
+      settings.editor = { ...readProvider(editor, settings.writer), think: Boolean(editor.think), enabled: true };
+    }
   } catch {
-    return undefined;
+    // No dev server: the defaults stand, and nothing the author set is lost — it is still on disk.
   }
 }
 
-export function saveStoredValidatorConfig(config: (LLMProviderConfig & { enabled: boolean }) | undefined): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (!config) localStorage.removeItem(VALIDATOR_STORAGE_KEY);
-    else localStorage.setItem(VALIDATOR_STORAGE_KEY, JSON.stringify(config));
-  } catch (err) {
-    console.error('Failed to save editor model config to localStorage:', err);
-  }
+const providerSettingsReady: Promise<void> = typeof fetch !== 'undefined' ? loadProviderSettings() : Promise.resolve();
+
+function persistProviderSettings(): void {
+  // PUT merges at the top level, so writing the provider choice leaves language and theme alone.
+  void fetch('/api/preferences', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ writer: settings.writer, editor: settings.editor ?? null }),
+  }).catch(() => undefined);
+}
+
+/** Resolves once the stored choice has been read, for a caller that must not race the load. */
+export function providerSettingsLoaded(): Promise<void> {
+  return providerSettingsReady;
+}
+
+export function getStoredProviderConfig(): LLMProviderConfig {
+  return settings.writer;
 }
 
 export function saveStoredProviderConfig(config: LLMProviderConfig): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(LLM_STORAGE_KEY, JSON.stringify(config));
-  } catch (err) {
-    console.error('Failed to save LLM provider config to localStorage:', err);
-  }
+  settings.writer = config;
+  persistProviderSettings();
+}
+
+/**
+ * The editor model, when the author wants one distinct from the writer. Undefined means the
+ * writer also judges its own prose, which is the weakest configuration and never recommended.
+ */
+export function getStoredValidatorConfig(): LLMProviderConfig | undefined {
+  const editor = settings.editor;
+  if (!editor?.enabled) return undefined;
+  const { enabled: _enabled, ...config } = editor;
+  return { ...config, think: Boolean(editor.think) };
+}
+
+export function saveStoredValidatorConfig(config: (LLMProviderConfig & { enabled: boolean }) | undefined): void {
+  settings.editor = config?.enabled ? config : undefined;
+  persistProviderSettings();
 }
 
 /**
@@ -114,7 +143,9 @@ export async function generateText(
       maxTokens,
       topP,
       topK,
-      config.think
+      config.think,
+      undefined,
+      trackOllamaUsage,
     );
   } else {
     result = await generateGeminiText(prompt, systemInstruction, schema, temperature, topP, topK, maxTokens, jsonOnly, config.geminiModel);
@@ -170,6 +201,7 @@ export async function generateTextStream(
       schema,
       temperature,
       maxTokens,
+      trackOllamaUsage,
     );
   } else {
     result = await generateGeminiTextStream(prompt, wrappedOnChunk, systemInstruction, temperature, undefined, undefined, config.geminiModel, schema, maxTokens);

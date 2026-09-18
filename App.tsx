@@ -7,6 +7,7 @@ import { useI18n } from './i18n';
 import useBookGenerator, { splitError } from './hooks/useBookGenerator';
 import { RunClock } from './components/RunClock';
 import { GenerationStep } from './types';
+import { MIN_CHAPTERS } from './constants';
 import UserInput from './components/UserInput';
 import ThemeToggle from './components/ThemeToggle';
 import SystemManualToggle from './components/SystemManualModal';
@@ -94,11 +95,11 @@ const App: React.FC = () => {
 
   const handleStartGeneration = () => {
     if (!storeReady) return;
-    if (storyPremise && numChapters >= 3) {
+    if (storyPremise && numChapters >= MIN_CHAPTERS) {
       startGeneration(storyPremise, numChapters);
     } else {
       // Basic validation feedback, can be improved
-      alert(t('wizard.app.validationAlert'));
+      alert(t('wizard.app.validationAlert', { minChapters: MIN_CHAPTERS }));
     }
   };
 

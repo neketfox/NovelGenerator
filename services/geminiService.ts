@@ -369,6 +369,9 @@ export async function generateGeminiTextStream(
             processChunk(chunkText);
           }
         }
+        // Only the aggregated response (available once the stream ends) carries usageMetadata;
+        // no partial chunk does. Same counter the non-streaming call already reports to.
+        trackUsageFromResponse(await result.response);
       });
       return fullText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     } catch (error) {

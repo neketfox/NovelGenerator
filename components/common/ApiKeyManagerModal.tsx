@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { addKeySlot, getKeyStatuses, removeKeySlot, onKeyPoolChange, type KeyStatus } from '../../services/geminiKeyPool';
-import { getStoredProviderConfig, saveStoredProviderConfig } from '../../services/llmService';
+import {
+  getStoredProviderConfig,
+  saveStoredProviderConfig,
+  getStoredValidatorConfig,
+  saveStoredValidatorConfig,
+  providerSettingsLoaded,
+} from '../../services/llmService';
 import { fetchOllamaModels } from '../../services/ollamaService';
+import { GEMINI_MODEL_NAME } from '../../constants';
 import type { LLMProviderConfig } from '../../types';
 import { useI18n } from '../../i18n';
 
@@ -9,30 +16,57 @@ interface Props {
   onClose: () => void;
 }
 
+const field = 'w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-sm text-zinc-100';
+const hint = 'text-xs text-zinc-500 mt-1';
+
 /**
- * Gemini keys, plus the same writer-provider toggle (Gemini/Ollama) the wizard's collapsed "AI
- * provider" section has — mirrored here so it's reachable without opening the wizard, and takes
- * effect immediately: llmService.ts re-reads this stored config on every model call, including
- * mid-generation, not just once at the start of a run.
+ * Everything about which model runs this installation, in one place: the provider is chosen by
+ * the tab, so Gemini's tab carries its model and the key pool that rotates through quota, and
+ * Ollama's carries its endpoint and model. The editor model sits below both because it is a
+ * second choice of the same kind — a reviewer that is not the writer.
+ *
+ * This is global and durable: every setting here lives in data/user/ beside the keys, not in a
+ * book and not in the browser, so it holds across books, tabs and restarts.
  */
 const ApiKeyManagerModal: React.FC<Props> = ({ onClose }) => {
   const { t } = useI18n();
   const [keys, setKeys] = useState<KeyStatus[]>(getKeyStatuses());
   const [label, setLabel] = useState('');
   const [key, setKey] = useState('');
-  const [providerConfig, setProviderConfig] = useState<LLMProviderConfig>(() => getStoredProviderConfig());
+  const [writer, setWriter] = useState<LLMProviderConfig>(getStoredProviderConfig());
+  const [editor, setEditor] = useState<(LLMProviderConfig & { enabled: boolean })>(() => {
+    const stored = getStoredValidatorConfig();
+    return { ...(stored ?? getStoredProviderConfig()), think: stored?.think ?? false, enabled: Boolean(stored) };
+  });
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-  const [fetchingModels, setFetchingModels] = useState(false);
+  const [fetchStatus, setFetchStatus] = useState<{ ok: boolean; message: string } | null>(null);
+  const [fetching, setFetching] = useState(false);
 
   useEffect(() => onKeyPoolChange(() => setKeys(getKeyStatuses())), []);
 
-  const updateProvider = (patch: Partial<LLMProviderConfig>) => {
-    const next = { ...providerConfig, ...patch };
-    setProviderConfig(next);
+  // The settings file is read once at startup; if this modal opened first, show what it holds
+  // rather than the defaults it was initialised with.
+  useEffect(() => {
+    void providerSettingsLoaded().then(() => {
+      setWriter(getStoredProviderConfig());
+      const stored = getStoredValidatorConfig();
+      setEditor({ ...(stored ?? getStoredProviderConfig()), think: stored?.think ?? false, enabled: Boolean(stored) });
+    });
+  }, []);
+
+  const updateWriter = (patch: Partial<LLMProviderConfig>) => {
+    const next = { ...writer, ...patch };
+    setWriter(next);
     saveStoredProviderConfig(next);
   };
 
-  const handleAdd = () => {
+  const updateEditor = (patch: Partial<LLMProviderConfig & { enabled: boolean }>) => {
+    const next = { ...editor, ...patch };
+    setEditor(next);
+    saveStoredValidatorConfig(next.enabled ? next : undefined);
+  };
+
+  const handleAddKey = () => {
     if (!key.trim()) return;
     addKeySlot(label.trim(), key.trim());
     setLabel('');
@@ -40,124 +74,201 @@ const ApiKeyManagerModal: React.FC<Props> = ({ onClose }) => {
   };
 
   const handleFetchModels = async () => {
-    setFetchingModels(true);
+    setFetching(true);
+    setFetchStatus(null);
     try {
-      const models = await fetchOllamaModels(providerConfig.ollamaEndpoint);
+      const models = await fetchOllamaModels(writer.ollamaEndpoint);
       setOllamaModels(models);
-      if (models.length && !models.includes(providerConfig.ollamaModel)) {
-        updateProvider({ ollamaModel: models[0] });
+      if (models.length) {
+        setFetchStatus({ ok: true, message: t('wizard.userInput.foundModels', { count: models.length }) });
+        if (!models.includes(writer.ollamaModel)) updateWriter({ ollamaModel: models[0] });
+      } else {
+        setFetchStatus({ ok: false, message: t('wizard.userInput.emptyModelList') });
       }
-    } catch {
-      // Same as the wizard's own fetch button: a failed lookup just leaves the list empty.
+    } catch (error) {
+      setFetchStatus({ ok: false, message: error instanceof Error ? error.message : t('wizard.userInput.ollamaConnectError') });
     } finally {
-      setFetchingModels(false);
+      setFetching(false);
     }
   };
 
+  const tab = (active: boolean) =>
+    `px-3 py-1.5 rounded text-xs font-medium transition-all ${active ? 'bg-zinc-200 text-zinc-900' : 'text-zinc-400 hover:text-zinc-300'}`;
+
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-md"
+        className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-md max-h-full overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg text-zinc-100 mb-3">{t('keys.provider.title')}</h2>
-        <div className="inline-flex rounded bg-zinc-950 p-1 border border-zinc-800 mb-3">
-          <button
-            type="button"
-            onClick={() => updateProvider({ provider: 'gemini' })}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${providerConfig.provider === 'gemini' ? 'bg-zinc-200 text-zinc-900' : 'text-zinc-400 hover:text-zinc-300'}`}
-          >
-            Gemini
+        <h2 className="text-lg text-zinc-100">{t('keys.provider.title')}</h2>
+        <p className={hint}>{t('keys.provider.explainer')}</p>
+
+        {/* The tab is the choice: whichever provider's settings you are looking at is the one
+            that writes. There is no second switch that could disagree with it. */}
+        <div className="inline-flex rounded bg-zinc-950 p-1 border border-zinc-800 my-3">
+          <button type="button" onClick={() => updateWriter({ provider: 'gemini' })} className={tab(writer.provider === 'gemini')}>
+            {t('wizard.userInput.providerGemini')}
           </button>
-          <button
-            type="button"
-            onClick={() => updateProvider({ provider: 'ollama' })}
-            className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${providerConfig.provider === 'ollama' ? 'bg-zinc-200 text-zinc-900' : 'text-zinc-400 hover:text-zinc-300'}`}
-          >
-            Ollama
+          <button type="button" onClick={() => updateWriter({ provider: 'ollama' })} className={tab(writer.provider === 'ollama')}>
+            {t('wizard.userInput.providerOllama')}
           </button>
         </div>
 
-        {providerConfig.provider === 'ollama' && (
-          <div className="flex flex-col gap-2 mb-4 bg-zinc-950 rounded-lg p-3">
-            <label className="text-xs text-zinc-400">
-              {t('keys.provider.endpoint')}
+        {writer.provider === 'gemini' ? (
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-sm text-zinc-400">{t('wizard.userInput.geminiModelLabel')}</label>
               <input
-                value={providerConfig.ollamaEndpoint}
-                onChange={(e) => updateProvider({ ollamaEndpoint: e.target.value })}
-                placeholder="/api/ollama"
-                className="mt-1 w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-sm text-zinc-100"
+                className={`${field} font-mono`}
+                value={writer.geminiModel ?? GEMINI_MODEL_NAME}
+                onChange={(e) => updateWriter({ geminiModel: e.target.value.trim() || undefined })}
+                placeholder={GEMINI_MODEL_NAME}
               />
-            </label>
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-zinc-400">{t('keys.provider.model')}</label>
-              <button
-                type="button"
-                onClick={() => void handleFetchModels()}
-                disabled={fetchingModels}
-                className="text-xs text-zinc-400 hover:text-zinc-300 underline disabled:opacity-50"
-              >
-                {fetchingModels ? '…' : t('keys.provider.fetchModels')}
-              </button>
+              <p className={hint}>{t('wizard.userInput.geminiModelHelp', { defaultModel: GEMINI_MODEL_NAME })}</p>
             </div>
-            {ollamaModels.length > 0 ? (
-              <select
-                value={providerConfig.ollamaModel}
-                onChange={(e) => updateProvider({ ollamaModel: e.target.value })}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-sm text-zinc-100"
-              >
-                {ollamaModels.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            ) : (
+
+            <div>
+              <h3 className="text-sm text-zinc-300 mb-1">{t('keys.title')}</h3>
+              <p className={hint}>{t('keys.rotationExplainer')}</p>
+              <ul className="space-y-2 my-2 max-h-40 overflow-y-auto">
+                {keys.map((slot) => (
+                  <li key={slot.id} className="flex items-center justify-between bg-zinc-800 rounded-md px-3 py-2 text-sm">
+                    <div>
+                      <div className="text-zinc-200">{slot.label} {slot.isActive && <span className="text-indigo-400">●</span>}</div>
+                      <div className="text-xs text-zinc-500">
+                        {slot.cooldownRemainingMs > 0
+                          ? t('keys.coolingDown', { seconds: Math.ceil(slot.cooldownRemainingMs / 1000) })
+                          : t('keys.ready')}
+                      </div>
+                    </div>
+                    <button onClick={() => removeKeySlot(slot.id)} className="text-zinc-500 hover:text-red-400 text-xs">
+                      {t('keys.remove')}
+                    </button>
+                  </li>
+                ))}
+                {keys.length === 0 && <li className="text-zinc-500 text-sm">{t('keys.none')}</li>}
+              </ul>
+              <div className="flex flex-col gap-2">
+                <input placeholder={t('keys.label')} value={label} onChange={(e) => setLabel(e.target.value)} className={field} />
+                <input placeholder={t('keys.key')} value={key} onChange={(e) => setKey(e.target.value)} type="password" className={field} />
+                <button onClick={handleAddKey} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md py-1.5 text-sm">
+                  {t('keys.add')}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-sm text-zinc-400">{t('wizard.userInput.ollamaEndpointLabel')}</label>
               <input
-                value={providerConfig.ollamaModel}
-                onChange={(e) => updateProvider({ ollamaModel: e.target.value })}
-                placeholder="llama3.1"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-sm text-zinc-100"
+                className={field}
+                value={writer.ollamaEndpoint}
+                onChange={(e) => updateWriter({ ollamaEndpoint: e.target.value })}
+                placeholder="/api/ollama"
               />
+              <p className={hint}>{t('wizard.userInput.ollamaEndpointHelp')}</p>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm text-zinc-400">{t('wizard.userInput.ollamaModelLabel')}</label>
+                <button
+                  type="button"
+                  onClick={() => void handleFetchModels()}
+                  disabled={fetching}
+                  className="text-xs text-zinc-400 hover:text-zinc-300 underline disabled:opacity-50"
+                >
+                  {fetching ? t('wizard.userInput.loading') : t('wizard.userInput.fetchOllamaModels')}
+                </button>
+              </div>
+              {ollamaModels.length > 0 ? (
+                <select className={field} value={writer.ollamaModel} onChange={(e) => updateWriter({ ollamaModel: e.target.value })}>
+                  {ollamaModels.map((model) => <option key={model} value={model}>{model}</option>)}
+                </select>
+              ) : (
+                <input className={field} value={writer.ollamaModel} onChange={(e) => updateWriter({ ollamaModel: e.target.value })} placeholder="llama3.1" />
+              )}
+              <p className={hint}>
+                {ollamaModels.length > 0
+                  ? t('wizard.userInput.selectedFromModels', { count: ollamaModels.length })
+                  : t('wizard.userInput.clickFetchModels')}
+              </p>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={writer.think ?? false}
+                onChange={(e) => updateWriter({ think: e.target.checked })}
+                className="accent-zinc-200"
+              />
+              <span className="font-medium">{t('wizard.userInput.reasoningLabel')}</span>
+            </label>
+            <p className={hint}>{t('wizard.userInput.reasoningHelp')}</p>
+
+            {fetchStatus && (
+              <div className={`text-xs px-3 py-2 rounded ${fetchStatus.ok
+                ? 'bg-emerald-950/40 text-emerald-300/90 border border-emerald-900/60'
+                : 'bg-red-950/40 text-red-300/90 border border-red-900/60'}`}>
+                {fetchStatus.message}
+              </div>
             )}
           </div>
         )}
 
-        <h2 className="text-lg text-zinc-100 mb-3">{t('keys.title')}</h2>
+        {/* The editor is the same kind of choice as the writer, so it lives under both tabs
+            rather than inside one: an Ollama writer may still be reviewed by Gemini. */}
+        <div className="mt-4 pt-3 border-t border-zinc-800 flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={editor.enabled}
+              onChange={(e) => updateEditor(e.target.checked
+                // Entering with the writer's current endpoint, so the editor never points at a
+                // stale address from an older stored config.
+                ? { enabled: true, ollamaEndpoint: writer.ollamaEndpoint }
+                : { enabled: false })}
+              className="accent-zinc-200"
+            />
+            <span className="font-medium">{t('wizard.userInput.editorModelLabel')}</span>
+          </label>
+          <p className={hint}>{t('wizard.userInput.editorModelHelp')}</p>
 
-        <ul className="space-y-2 mb-4 max-h-60 overflow-y-auto">
-          {keys.map((k) => (
-            <li key={k.id} className="flex items-center justify-between bg-zinc-800 rounded-md px-3 py-2 text-sm">
-              <div>
-                <div className="text-zinc-200">{k.label} {k.isActive && <span className="text-indigo-400">●</span>}</div>
-                <div className="text-xs text-zinc-500">
-                  {k.cooldownRemainingMs > 0
-                    ? `Cooling down · resets in ${Math.ceil(k.cooldownRemainingMs / 1000)}s`
-                    : 'Ready'}
-                </div>
+          {editor.enabled && (
+            <div className="flex flex-col gap-2">
+              <div className="inline-flex rounded bg-zinc-950 p-1 border border-zinc-800 self-start">
+                <button type="button" onClick={() => updateEditor({ provider: 'gemini' })} className={tab(editor.provider === 'gemini')}>
+                  {t('wizard.userInput.providerGemini')}
+                </button>
+                <button type="button" onClick={() => updateEditor({ provider: 'ollama' })} className={tab(editor.provider === 'ollama')}>
+                  {t('wizard.userInput.providerOllama')}
+                </button>
               </div>
-              <button onClick={() => removeKeySlot(k.id)} className="text-zinc-500 hover:text-red-400 text-xs">
-                {t('keys.remove')}
-              </button>
-            </li>
-          ))}
-          {keys.length === 0 && <li className="text-zinc-500 text-sm">No keys configured — using the default environment key.</li>}
-        </ul>
-
-        <div className="flex flex-col gap-2">
-          <input
-            placeholder={t('keys.label')}
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-sm text-zinc-100"
-          />
-          <input
-            placeholder={t('keys.key')}
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            type="password"
-            className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-sm text-zinc-100"
-          />
-          <button onClick={handleAdd} className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-md py-1.5 text-sm">
-            {t('keys.add')}
-          </button>
+              {editor.provider === 'gemini' ? (
+                <div>
+                  <label className="text-sm text-zinc-400">{t('wizard.userInput.editorGeminiLabel')}</label>
+                  <input
+                    className={`${field} font-mono`}
+                    value={editor.geminiModel ?? GEMINI_MODEL_NAME}
+                    onChange={(e) => updateEditor({ geminiModel: e.target.value.trim() || undefined })}
+                    placeholder={GEMINI_MODEL_NAME}
+                  />
+                  <p className={hint}>{t('wizard.userInput.editorGeminiHelp', { defaultModel: GEMINI_MODEL_NAME })}</p>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-sm text-zinc-400">{t('wizard.userInput.editorOllamaLabel')}</label>
+                  <input className={field} value={editor.ollamaModel} onChange={(e) => updateEditor({ ollamaModel: e.target.value })} placeholder="llama3.1" />
+                  <p className={hint}>{t('wizard.userInput.editorOllamaHelp')}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        <p className={`${hint} mt-3`}>{t('wizard.userInput.localChecksNote')}</p>
 
         <button onClick={onClose} className="mt-4 text-xs text-zinc-500 hover:text-zinc-300">{t('common.close')}</button>
       </div>

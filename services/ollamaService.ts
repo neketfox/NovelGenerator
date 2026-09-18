@@ -106,8 +106,22 @@ export async function fetchOllamaModels(endpoint: string = DEFAULT_OLLAMA_ENDPOI
   }
 }
 
-/** Read every NDJSON frame and require a successful terminal record. Partial text is never success. */
-export async function readOllamaCompletion(response: Response, onChunk?: (text: string) => void): Promise<string> {
+export interface OllamaUsage {
+  promptTokens: number;
+  completionTokens: number;
+}
+
+/**
+ * Read every NDJSON frame and require a successful terminal record. Partial text is never
+ * success. The terminal record also carries Ollama's own token counts (prompt_eval_count,
+ * eval_count) — the local equivalent of Gemini's usageMetadata — reported through onUsage so
+ * the statistics panel is not Gemini-only.
+ */
+export async function readOllamaCompletion(
+  response: Response,
+  onChunk?: (text: string) => void,
+  onUsage?: (usage: OllamaUsage) => void,
+): Promise<string> {
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
     throw new Error(`Ollama request failed [${response.status}]: ${detail || response.statusText}`);
@@ -127,6 +141,11 @@ export async function readOllamaCompletion(response: Response, onChunk?: (text: 
     if (frame.done) {
       if (['length', 'max_tokens'].includes(frame.done_reason)) throw new Error('Ollama output reached its token limit; the incomplete response was rejected.');
       completed = true;
+      // Only the terminal record carries these — a model that never finished a turn spent
+      // nothing worth counting, so no onUsage call for the frames that led up to it.
+      if (onUsage && (typeof frame.prompt_eval_count === 'number' || typeof frame.eval_count === 'number')) {
+        onUsage({ promptTokens: frame.prompt_eval_count ?? 0, completionTokens: frame.eval_count ?? 0 });
+      }
     }
   };
   if (response.body && typeof response.body.getReader === 'function') {
@@ -159,7 +178,7 @@ export async function generateOllamaText(
   prompt: string, systemInstruction?: string, schema?: object, temperature = 0.7,
   model = DEFAULT_OLLAMA_MODEL, endpoint = DEFAULT_OLLAMA_ENDPOINT,
   maxTokens?: number, topP?: number, topK?: number, think = false,
-  onChunk?: (text: string) => void
+  onChunk?: (text: string) => void, onUsage?: (usage: OllamaUsage) => void,
 ): Promise<string> {
   const base = endpoint.replace(/\/+$/, '');
   // Thinking is off unless the caller's provider role enables it; only message.content is ever read.
@@ -182,7 +201,7 @@ export async function generateOllamaText(
         body: JSON.stringify(buildOllamaGeneratePayload({ model, prompt, system, temperature, schema, isJson: Boolean(schema), stream: true, think, maxTokens, topP, topK })),
       });
     }
-    return await readOllamaCompletion(response, onChunk);
+    return await readOllamaCompletion(response, onChunk, onUsage);
   } finally { clearTimeout(timeout); }
 }
 
@@ -195,9 +214,9 @@ export async function generateOllamaText(
 export async function generateOllamaTextStream(
   prompt: string, onChunk: (chunk: string) => void, systemInstruction?: string,
   model = DEFAULT_OLLAMA_MODEL, endpoint = DEFAULT_OLLAMA_ENDPOINT,
-  schema?: object, temperature = 0.7, maxTokens?: number
+  schema?: object, temperature = 0.7, maxTokens?: number, onUsage?: (usage: OllamaUsage) => void,
 ): Promise<string> {
-  return generateOllamaText(prompt, systemInstruction, schema, temperature, model, endpoint, maxTokens, undefined, undefined, false, onChunk);
+  return generateOllamaText(prompt, systemInstruction, schema, temperature, model, endpoint, maxTokens, undefined, undefined, false, onChunk, onUsage);
 }
 
 /**
