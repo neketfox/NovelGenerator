@@ -419,5 +419,7 @@
   "import.stage.reading": "Читаю розділ {{chapter}} з {{of}}…",
   "import.stage.designing": "Відновлюю конструкцію книжки…",
   "import.stage.editing": "Редагую розділ {{chapter}} з {{of}}…",
-  "import.stage.done": "Готово."
+  "import.stage.done": "Готово.",
+  "wizard.userInput.contextWindowLabel": "Вікно контексту (токенів)",
+  "wizard.userInput.contextWindowHelp": "Скільки модель тримає за раз. Замало — розділ обривається на півслові; обрив автоматично повторюється з ширшим вікном, до {{max}}."
 }

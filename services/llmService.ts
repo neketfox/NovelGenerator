@@ -5,7 +5,7 @@
 
 import { LLMProviderConfig } from '../types';
 import { generateGeminiText, generateGeminiTextStream } from './geminiService';
-import { generateOllamaText, generateOllamaTextStream, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_OLLAMA_MODEL, type OllamaUsage } from './ollamaService';
+import { generateOllamaText, generateOllamaTextStream, DEFAULT_OLLAMA_ENDPOINT, DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_NUM_CTX, type OllamaUsage } from './ollamaService';
 import { logToTerminal } from '../utils/terminalLogger';
 import { recordUsage } from './usageTracker';
 
@@ -18,8 +18,26 @@ function trackOllamaUsage(usage: OllamaUsage): void {
 export const DEFAULT_LLM_CONFIG: LLMProviderConfig = {
   provider: 'gemini',
   ollamaEndpoint: DEFAULT_OLLAMA_ENDPOINT,
-  ollamaModel: DEFAULT_OLLAMA_MODEL
+  ollamaModel: DEFAULT_OLLAMA_MODEL,
+  ollamaNumCtx: DEFAULT_OLLAMA_NUM_CTX
 };
+
+/**
+ * A run that had to widen the window tells the author about it once, not once per call: the
+ * useful message is "this model needs a bigger window", and repeating it every chapter buries
+ * the run log it is written into.
+ */
+const widened = new Set<string>();
+
+function reportWidening(model: string, from: number, to: number): void {
+  const note = `${model}:${to}`;
+  logToTerminal(
+    `${model} ran out of room at ${from} tokens; retrying the same call with a ${to}-token context window. Set this permanently in the AI Provider settings to avoid the retry.`,
+    'LLM',
+    widened.has(note) ? 'llm' : 'warn',
+  );
+  widened.add(note);
+}
 
 /**
  * Which model writes and which model reviews, kept in data/user/preferences.json beside the
@@ -48,6 +66,7 @@ function readProvider(raw: unknown, fallback: LLMProviderConfig): LLMProviderCon
     ...(typeof parsed.think === 'boolean' ? { think: parsed.think } : {}),
     // Only present when the author typed one: stored configs keep their exact shape otherwise.
     ...(typeof parsed.geminiModel === 'string' && parsed.geminiModel.trim() ? { geminiModel: parsed.geminiModel.trim() } : {}),
+    ...(Number.isFinite(parsed.ollamaNumCtx) ? { ollamaNumCtx: Number(parsed.ollamaNumCtx) } : fallback.ollamaNumCtx ? { ollamaNumCtx: fallback.ollamaNumCtx } : {}),
   };
 }
 
@@ -146,6 +165,8 @@ export async function generateText(
       config.think,
       undefined,
       trackOllamaUsage,
+      config.ollamaNumCtx ?? DEFAULT_OLLAMA_NUM_CTX,
+      (from, to) => reportWidening(config.ollamaModel, from, to),
     );
   } else {
     result = await generateGeminiText(prompt, systemInstruction, schema, temperature, topP, topK, maxTokens, jsonOnly, config.geminiModel);
@@ -202,6 +223,8 @@ export async function generateTextStream(
       temperature,
       maxTokens,
       trackOllamaUsage,
+      config.ollamaNumCtx ?? DEFAULT_OLLAMA_NUM_CTX,
+      (from, to) => reportWidening(config.ollamaModel, from, to),
     );
   } else {
     result = await generateGeminiTextStream(prompt, wrappedOnChunk, systemInstruction, temperature, undefined, undefined, config.geminiModel, schema, maxTokens);

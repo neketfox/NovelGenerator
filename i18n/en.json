@@ -419,5 +419,7 @@
   "import.stage.reading": "Reading chapter {{chapter}} of {{of}}…",
   "import.stage.designing": "Recovering the book's construction…",
   "import.stage.editing": "Editing chapter {{chapter}} of {{of}}…",
-  "import.stage.done": "Done."
+  "import.stage.done": "Done.",
+  "wizard.userInput.contextWindowLabel": "Context window (tokens)",
+  "wizard.userInput.contextWindowHelp": "How much the model may hold at once. Too small and a chapter is cut off mid-sentence; a cut-off answer is retried automatically with a wider window, up to {{max}}."
 }

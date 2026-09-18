@@ -7,7 +7,7 @@ import {
   saveStoredValidatorConfig,
   providerSettingsLoaded,
 } from '../../services/llmService';
-import { fetchOllamaModels } from '../../services/ollamaService';
+import { fetchOllamaModels, DEFAULT_OLLAMA_NUM_CTX, MAX_OLLAMA_NUM_CTX } from '../../services/ollamaService';
 import { GEMINI_MODEL_NAME } from '../../constants';
 import type { LLMProviderConfig } from '../../types';
 import { useI18n } from '../../i18n';
@@ -54,6 +54,14 @@ const ApiKeyManagerModal: React.FC<Props> = ({ onClose }) => {
     });
   }, []);
 
+  // The list is what makes a model choosable at all, so it is fetched on opening rather than
+  // behind a button: an author who has to press "fetch" before the editor field means anything
+  // reads that field as broken. A machine with no Ollama running simply keeps the text inputs.
+  useEffect(() => {
+    if (writer.provider === 'ollama' || editor.provider === 'ollama') void handleFetchModels(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [writer.provider, writer.ollamaEndpoint, editor.provider]);
+
   const updateWriter = (patch: Partial<LLMProviderConfig>) => {
     const next = { ...writer, ...patch };
     setWriter(next);
@@ -61,7 +69,10 @@ const ApiKeyManagerModal: React.FC<Props> = ({ onClose }) => {
   };
 
   const updateEditor = (patch: Partial<LLMProviderConfig & { enabled: boolean }>) => {
-    const next = { ...editor, ...patch };
+    // The editor always speaks to the writer's Ollama, so a model that exists for one exists
+    // for the other. Keeping a second endpoint here is how "the model does not exist" happened
+    // for a model sitting right there in the writer's list.
+    const next = { ...editor, ...patch, ollamaEndpoint: writer.ollamaEndpoint };
     setEditor(next);
     saveStoredValidatorConfig(next.enabled ? next : undefined);
   };
@@ -73,20 +84,20 @@ const ApiKeyManagerModal: React.FC<Props> = ({ onClose }) => {
     setKey('');
   };
 
-  const handleFetchModels = async () => {
+  const handleFetchModels = async (announce = true) => {
     setFetching(true);
-    setFetchStatus(null);
+    if (announce) setFetchStatus(null);
     try {
       const models = await fetchOllamaModels(writer.ollamaEndpoint);
       setOllamaModels(models);
       if (models.length) {
-        setFetchStatus({ ok: true, message: t('wizard.userInput.foundModels', { count: models.length }) });
+        if (announce) setFetchStatus({ ok: true, message: t('wizard.userInput.foundModels', { count: models.length }) });
         if (!models.includes(writer.ollamaModel)) updateWriter({ ollamaModel: models[0] });
-      } else {
+      } else if (announce) {
         setFetchStatus({ ok: false, message: t('wizard.userInput.emptyModelList') });
       }
     } catch (error) {
-      setFetchStatus({ ok: false, message: error instanceof Error ? error.message : t('wizard.userInput.ollamaConnectError') });
+      if (announce) setFetchStatus({ ok: false, message: error instanceof Error ? error.message : t('wizard.userInput.ollamaConnectError') });
     } finally {
       setFetching(false);
     }
@@ -197,6 +208,19 @@ const ApiKeyManagerModal: React.FC<Props> = ({ onClose }) => {
               </p>
             </div>
 
+            <div>
+              <label className="text-sm text-zinc-400">{t('wizard.userInput.contextWindowLabel')}</label>
+              <input
+                className={field}
+                type="number"
+                min={1024}
+                step={1024}
+                value={writer.ollamaNumCtx ?? DEFAULT_OLLAMA_NUM_CTX}
+                onChange={(e) => updateWriter({ ollamaNumCtx: Math.max(1024, Number(e.target.value) || DEFAULT_OLLAMA_NUM_CTX) })}
+              />
+              <p className={hint}>{t('wizard.userInput.contextWindowHelp', { max: MAX_OLLAMA_NUM_CTX })}</p>
+            </div>
+
             <label className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer">
               <input
                 type="checkbox"
@@ -259,9 +283,39 @@ const ApiKeyManagerModal: React.FC<Props> = ({ onClose }) => {
                 </div>
               ) : (
                 <div>
-                  <label className="text-sm text-zinc-400">{t('wizard.userInput.editorOllamaLabel')}</label>
-                  <input className={field} value={editor.ollamaModel} onChange={(e) => updateEditor({ ollamaModel: e.target.value })} placeholder="llama3.1" />
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-zinc-400">{t('wizard.userInput.editorOllamaLabel')}</label>
+                    <button
+                      type="button"
+                      onClick={() => void handleFetchModels()}
+                      disabled={fetching}
+                      className="text-xs text-zinc-400 hover:text-zinc-300 underline disabled:opacity-50"
+                    >
+                      {fetching ? t('wizard.userInput.loading') : t('wizard.userInput.fetchOllamaModels')}
+                    </button>
+                  </div>
+                  {ollamaModels.length > 0 ? (
+                    <select className={field} value={editor.ollamaModel} onChange={(e) => updateEditor({ ollamaModel: e.target.value })}>
+                      {/* A stored choice that is no longer installed stays visible and stays
+                          selected, so the author sees what is configured instead of silently
+                          being moved onto another model. */}
+                      {(ollamaModels.includes(editor.ollamaModel) ? ollamaModels : [editor.ollamaModel, ...ollamaModels])
+                        .filter(Boolean)
+                        .map((model) => <option key={model} value={model}>{model}</option>)}
+                    </select>
+                  ) : (
+                    <input className={field} value={editor.ollamaModel} onChange={(e) => updateEditor({ ollamaModel: e.target.value.trim() })} placeholder="llama3.1" />
+                  )}
                   <p className={hint}>{t('wizard.userInput.editorOllamaHelp')}</p>
+                  <label className="text-sm text-zinc-400 mt-2 block">{t('wizard.userInput.contextWindowLabel')}</label>
+                  <input
+                    className={field}
+                    type="number"
+                    min={1024}
+                    step={1024}
+                    value={editor.ollamaNumCtx ?? writer.ollamaNumCtx ?? DEFAULT_OLLAMA_NUM_CTX}
+                    onChange={(e) => updateEditor({ ollamaNumCtx: Math.max(1024, Number(e.target.value) || DEFAULT_OLLAMA_NUM_CTX) })}
+                  />
                 </div>
               )}
             </div>

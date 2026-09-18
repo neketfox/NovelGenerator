@@ -17,6 +17,7 @@ export interface OllamaGeneratePayload {
     top_p?: number;
     top_k?: number;
     num_predict?: number;
+    num_ctx?: number;
   };
 }
 
@@ -49,6 +50,7 @@ export function buildOllamaGeneratePayload(params: {
   maxTokens?: number;
   topP?: number;
   topK?: number;
+  numCtx?: number;
 }): OllamaGeneratePayload {
   const payload: OllamaGeneratePayload = {
     model: params.model || DEFAULT_OLLAMA_MODEL,
@@ -59,7 +61,8 @@ export function buildOllamaGeneratePayload(params: {
       temperature: params.temperature ?? 0.7,
       ...(params.maxTokens !== undefined ? { num_predict: params.maxTokens } : {}),
       ...(params.topP !== undefined ? { top_p: params.topP } : {}),
-      ...(params.topK !== undefined ? { top_k: params.topK } : {})
+      ...(params.topK !== undefined ? { top_k: params.topK } : {}),
+      ...(params.numCtx !== undefined ? { num_ctx: params.numCtx } : {})
     }
   };
 
@@ -106,6 +109,26 @@ export async function fetchOllamaModels(endpoint: string = DEFAULT_OLLAMA_ENDPOI
   }
 }
 
+/**
+ * The context window a local model is given, and the ceiling the transport will raise it to.
+ *
+ * Ollama's own default window is 4096 tokens on most builds, which a chapter prompt plus its
+ * answer does not fit into — and Ollama does not refuse that, it writes until the window is
+ * full and stops mid-sentence. That arrives here as done_reason "length", and rejecting it is
+ * right: half a chapter is not a chapter. But rejecting it forever is not, when the fix is a
+ * number.
+ */
+export const DEFAULT_OLLAMA_NUM_CTX = 8192;
+export const MAX_OLLAMA_NUM_CTX = 32768;
+
+/** A response cut off because the window filled. Distinguished so callers can widen and retry. */
+export class OllamaTruncatedError extends Error {
+  constructor(public readonly numCtx: number | undefined, message?: string) {
+    super(message ?? 'Ollama output reached its token limit; the incomplete response was rejected.');
+    this.name = 'OllamaTruncatedError';
+  }
+}
+
 export interface OllamaUsage {
   promptTokens: number;
   completionTokens: number;
@@ -139,7 +162,7 @@ export async function readOllamaCompletion(
     // final content, and a stream that ends without its completion record is still rejected whole.
     if (text && onChunk) onChunk(text);
     if (frame.done) {
-      if (['length', 'max_tokens'].includes(frame.done_reason)) throw new Error('Ollama output reached its token limit; the incomplete response was rejected.');
+      if (['length', 'max_tokens'].includes(frame.done_reason)) throw new OllamaTruncatedError(undefined);
       completed = true;
       // Only the terminal record carries these — a model that never finished a turn spent
       // nothing worth counting, so no onUsage call for the frames that led up to it.
@@ -174,16 +197,12 @@ export async function readOllamaCompletion(
 }
 
 /** Stream transport prevents proxy inactivity; fallback is only for unsupported chat endpoints. */
-export async function generateOllamaText(
-  prompt: string, systemInstruction?: string, schema?: object, temperature = 0.7,
-  model = DEFAULT_OLLAMA_MODEL, endpoint = DEFAULT_OLLAMA_ENDPOINT,
-  maxTokens?: number, topP?: number, topK?: number, think = false,
+async function callOllamaOnce(
+  prompt: string, system: string, schema: object | undefined, temperature: number,
+  model: string, base: string, maxTokens: number | undefined, topP: number | undefined,
+  topK: number | undefined, think: boolean, numCtx: number,
   onChunk?: (text: string) => void, onUsage?: (usage: OllamaUsage) => void,
 ): Promise<string> {
-  const base = endpoint.replace(/\/+$/, '');
-  // Thinking is off unless the caller's provider role enables it; only message.content is ever read.
-  // Suppressing reasoning in the prompt would defeat a role that deliberately enables thinking.
-  const system = `${systemInstruction || ''}${think ? '' : '\nDo not output reasoning or thinking; return only the requested final answer.'}${schema ? `\nReturn one JSON object matching this schema: ${JSON.stringify(schema)}` : ''}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(new Error('Ollama request exceeded the 15 minute deadline.')), 900000);
   try {
@@ -191,18 +210,70 @@ export async function generateOllamaText(
       method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
       body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
         stream: true, think, ...(schema ? { format: schema } : {}),
-        options: { temperature, ...(maxTokens !== undefined ? { num_predict: maxTokens } : {}),
+        options: { temperature, num_ctx: numCtx, ...(maxTokens !== undefined ? { num_predict: maxTokens } : {}),
           ...(topP !== undefined ? { top_p: topP } : {}), ...(topK !== undefined ? { top_k: topK } : {}) } }),
     });
     if (response.status === 404 || response.status === 405) {
       await response.body?.cancel();
       response = await fetch(`${base}/api/generate`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify(buildOllamaGeneratePayload({ model, prompt, system, temperature, schema, isJson: Boolean(schema), stream: true, think, maxTokens, topP, topK })),
+        body: JSON.stringify(buildOllamaGeneratePayload({ model, prompt, system, temperature, schema, isJson: Boolean(schema), stream: true, think, maxTokens, topP, topK, numCtx })),
       });
     }
-    return await readOllamaCompletion(response, onChunk, onUsage);
+    try {
+      return await readOllamaCompletion(response, onChunk, onUsage);
+    } catch (error) {
+      // The reader does not know what window it was reading against; this does.
+      if (error instanceof OllamaTruncatedError) throw new OllamaTruncatedError(numCtx, error.message);
+      throw error;
+    }
   } finally { clearTimeout(timeout); }
+}
+
+/**
+ * One call to a local model, widening the window rather than losing the work.
+ *
+ * A truncated answer used to end the chapter: the run stopped with "Ollama output reached its
+ * token limit", and the author's only recourse was to find the setting and start again. The
+ * book's memory is on disk, so nothing about a retry is delicate — every call here is already
+ * one that can be made again — and the remedy is a single number. So a cut-off answer doubles
+ * the context window and asks once more, up to the ceiling, and only then gives up, saying what
+ * it tried so the number can be raised by hand if the machine has room for it.
+ *
+ * The prompt is never silently shortened to fit: a chapter written against half its memory is
+ * worse than a chapter that failed loudly.
+ */
+export async function generateOllamaText(
+  prompt: string, systemInstruction?: string, schema?: object, temperature = 0.7,
+  model = DEFAULT_OLLAMA_MODEL, endpoint = DEFAULT_OLLAMA_ENDPOINT,
+  maxTokens?: number, topP?: number, topK?: number, think = false,
+  onChunk?: (text: string) => void, onUsage?: (usage: OllamaUsage) => void,
+  numCtx: number = DEFAULT_OLLAMA_NUM_CTX,
+  onWiden: (from: number, to: number) => void = () => {},
+): Promise<string> {
+  const base = endpoint.replace(/\/+$/, '');
+  // Thinking is off unless the caller's provider role enables it; only message.content is ever read.
+  // Suppressing reasoning in the prompt would defeat a role that deliberately enables thinking.
+  const system = `${systemInstruction || ''}${think ? '' : '\nDo not output reasoning or thinking; return only the requested final answer.'}${schema ? `\nReturn one JSON object matching this schema: ${JSON.stringify(schema)}` : ''}`;
+  let window = Math.max(1024, Math.round(numCtx) || DEFAULT_OLLAMA_NUM_CTX);
+  for (;;) {
+    try {
+      return await callOllamaOnce(prompt, system, schema, temperature, model, base, maxTokens, topP, topK, think, window, onChunk, onUsage);
+    } catch (error) {
+      if (!(error instanceof OllamaTruncatedError) || window >= MAX_OLLAMA_NUM_CTX) {
+        if (error instanceof OllamaTruncatedError) {
+          throw new OllamaTruncatedError(window, `Ollama output reached its token limit even at a ${window}-token context window, the widest this will try. Raise the context window in the AI Provider settings if the machine has room for it, or give the run a model that answers more briefly.`);
+        }
+        throw error;
+      }
+      const wider = Math.min(MAX_OLLAMA_NUM_CTX, window * 2);
+      onWiden(window, wider);
+      window = wider;
+      // A partial answer already streamed to the page is not the answer: the caller is told
+      // the retry starts over so nothing half-written is mistaken for progress.
+      onChunk?.('');
+    }
+  }
 }
 
 /**
@@ -215,8 +286,9 @@ export async function generateOllamaTextStream(
   prompt: string, onChunk: (chunk: string) => void, systemInstruction?: string,
   model = DEFAULT_OLLAMA_MODEL, endpoint = DEFAULT_OLLAMA_ENDPOINT,
   schema?: object, temperature = 0.7, maxTokens?: number, onUsage?: (usage: OllamaUsage) => void,
+  numCtx: number = DEFAULT_OLLAMA_NUM_CTX, onWiden?: (from: number, to: number) => void,
 ): Promise<string> {
-  return generateOllamaText(prompt, systemInstruction, schema, temperature, model, endpoint, maxTokens, undefined, undefined, false, onChunk, onUsage);
+  return generateOllamaText(prompt, systemInstruction, schema, temperature, model, endpoint, maxTokens, undefined, undefined, false, onChunk, onUsage, numCtx, onWiden);
 }
 
 /**

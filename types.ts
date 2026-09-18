@@ -335,4 +335,11 @@ export interface LLMProviderConfig {
    * the generator forces thinking off on that route regardless of this flag.
    */
   think?: boolean;
+  /**
+   * Ollama's context window in tokens (num_ctx). Ollama's own default is small enough that a
+   * chapter-sized prompt plus its answer does not fit, and the answer is cut off mid-sentence
+   * rather than refused — so this is a setting, and the transport raises it on its own when a
+   * response is truncated anyway. Absent means the built-in default.
+   */
+  ollamaNumCtx?: number;
 }

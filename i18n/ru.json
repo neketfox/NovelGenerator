@@ -419,5 +419,7 @@
   "import.stage.reading": "Читаю главу {{chapter}} из {{of}}…",
   "import.stage.designing": "Восстанавливаю конструкцию книги…",
   "import.stage.editing": "Редактирую главу {{chapter}} из {{of}}…",
-  "import.stage.done": "Готово."
+  "import.stage.done": "Готово.",
+  "wizard.userInput.contextWindowLabel": "Окно контекста (токенов)",
+  "wizard.userInput.contextWindowHelp": "Сколько модель держит за раз. Мало — глава обрывается на полуслове; обрыв автоматически повторяется с более широким окном, до {{max}}."
 }
