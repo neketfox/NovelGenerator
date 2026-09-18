@@ -50,7 +50,8 @@ async function retryWithBackoff<T>(
       lastError = error instanceof Error ? error : new Error(String(error));
 
       // Don't retry on certain permanent errors
-      if (lastError.message.includes("API key not valid") ||
+      if (lastError.message.includes("No Gemini API key configured") ||
+          lastError.message.includes("API key not valid") ||
           lastError.message.includes("quota exceeded") ||
           lastError.message.includes("exceeded your API quota") ||
           lastError.message.includes("FreeTier") ||

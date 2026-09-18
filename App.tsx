@@ -25,6 +25,7 @@ import CodexPanel from './components/codex/CodexPanel';
 import CoverPanel from './components/editor/CoverPanel';
 import AuthorRequestPanel from './components/editor/AuthorRequestPanel';
 import { chaptersToStudioProject } from './services/importFromGenerator';
+import { decideProjectView } from './utils/projectView';
 
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -115,11 +116,16 @@ const App: React.FC = () => {
   const isCreating = !routeProjectId;
   const hasStoredWork = generatedChapters.length > 0 || !!currentStoryOutline;
 
-  const showProgress = !isCreating && storeReady && (isLoading || hasStoredWork) &&
-                       currentStep !== GenerationStep.Done &&
-                       currentStep !== GenerationStep.Error &&
-                       currentStep !== GenerationStep.WaitingForOutlineApproval &&
-                       currentStep !== GenerationStep.GeneratingOutline;
+  // One decision, so no combination can fall through the gaps and render an empty page.
+  const view = decideProjectView({
+    isCreating,
+    storeReady,
+    isLoading,
+    currentStep,
+    hasStoredWork,
+    hasFinalBook: !!finalBookContent,
+  });
+  const showProgress = view === 'progress';
 
   const isStudioLayout = showProgress;
 
@@ -304,11 +310,11 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {currentStep === GenerationStep.Idle && !finalBookContent && !storeReady && (
+        {view === 'opening' && (
           <p className="text-zinc-500 text-xs">{t('wizard.app.openingStorage')}</p>
         )}
 
-        {isCreating && currentStep === GenerationStep.Idle && !finalBookContent && storeReady && (
+        {view === 'form' && (
           <>
             <UserInput
               storyPremise={storyPremise}
@@ -326,7 +332,7 @@ const App: React.FC = () => {
           </>
         )}
         
-        {currentStep === GenerationStep.GeneratingOutline && (
+        {view === 'designing' && (
           <div className="text-center py-12">
             <LoadingSpinner />
             <p className="mt-4 text-zinc-300 text-sm font-medium">{t('wizard.app.designingBook')}</p>
@@ -377,7 +383,7 @@ const App: React.FC = () => {
         )}
 
 
-        {finalBookContent && finalMetadataJson && (
+        {view === 'finished' && finalMetadataJson && (
           <>
             <BookDisplay
               bookContent={finalBookContent}

@@ -240,6 +240,14 @@ export default function useBookGenerator(projectId?: string, onProjectCreated?: 
       setStoreReady(true);
       return () => { live = false; };
     }
+    // Already holding this slot: starting a book mints it and moves the URL onto it, which
+    // runs this effect again. Re-opening would hand the page a second store read from a file
+    // the run has not flushed yet — the run keeps writing into the first one while the page
+    // reads an empty second one, and the book looks like it vanished.
+    if (storeRef.current?.projectId === projectId) {
+      setStoreReady(true);
+      return () => { live = false; };
+    }
     setStoreReady(false);
     PersistentProjectStore.open(projectId).then(store => {
       if (!live) return;
