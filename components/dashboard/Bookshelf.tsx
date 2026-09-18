@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listSlots, deleteSlot, type SlotSummary } from '../../services/projectSlots';
 import { useI18n } from '../../i18n';
+import ImportBookModal from './ImportBookModal';
 
 function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString() : '—';
@@ -15,6 +16,7 @@ function formatDate(iso: string | null): string {
  */
 const Bookshelf: React.FC = () => {
   const [slots, setSlots] = useState<SlotSummary[] | null>(null);
+  const [importing, setImporting] = useState(false);
   const navigate = useNavigate();
   const { t } = useI18n();
 
@@ -37,6 +39,15 @@ const Bookshelf: React.FC = () => {
         >
           <span className="text-4xl leading-none">+</span>
           <span className="text-sm">{t('dashboard.newBook')}</span>
+        </button>
+
+        <button
+          onClick={() => setImporting(true)}
+          className="flex flex-col items-center justify-center gap-2 h-56 rounded-xl border-2 border-dashed border-zinc-700 text-zinc-400 hover:border-indigo-500 hover:text-indigo-400 transition-colors px-4 text-center"
+        >
+          <span className="text-3xl leading-none">&#8681;</span>
+          <span className="text-sm">{t('dashboard.importBook')}</span>
+          <span className="text-xs text-zinc-600">{t('dashboard.importHint')}</span>
         </button>
 
         {slots === null && <div className="col-span-full text-zinc-500 text-sm">…</div>}
@@ -75,6 +86,7 @@ const Bookshelf: React.FC = () => {
           </div>
         ))}
       </div>
+      {importing && <ImportBookModal onClose={() => { setImporting(false); reload(); }} />}
     </div>
   );
 };

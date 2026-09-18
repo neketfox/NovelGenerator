@@ -9,6 +9,9 @@ import p05Raw from '../../prompts/P05_STATE_UPDATE.md?raw';
 import p06Raw from '../../prompts/P06_FORWARD_UPDATE.md?raw';
 import p07Raw from '../../prompts/P07_FINAL_AUDIT.md?raw';
 import p08Raw from '../../prompts/P08_SPAN_REPAIR.md?raw';
+import p09Raw from '../../prompts/P09_IMPORT_READ.md?raw';
+import p10Raw from '../../prompts/P10_IMPORT_DESIGN.md?raw';
+import p11Raw from '../../prompts/P11_IMPORT_EDIT.md?raw';
 
 /**
  * The pipeline prompts plus the shared system contract live as files under
@@ -26,7 +29,10 @@ export type PipelinePromptName =
   | 'P05_STATE_UPDATE'
   | 'P06_FORWARD_UPDATE'
   | 'P07_FINAL_AUDIT'
-  | 'P08_SPAN_REPAIR';
+  | 'P08_SPAN_REPAIR'
+  | 'P09_IMPORT_READ'
+  | 'P10_IMPORT_DESIGN'
+  | 'P11_IMPORT_EDIT';
 
 const TEMPLATES: Record<PipelinePromptName, string> = {
   P01_BOOK_DESIGN: p01Raw,
@@ -39,6 +45,9 @@ const TEMPLATES: Record<PipelinePromptName, string> = {
   P06_FORWARD_UPDATE: p06Raw,
   P07_FINAL_AUDIT: p07Raw,
   P08_SPAN_REPAIR: p08Raw,
+  P09_IMPORT_READ: p09Raw,
+  P10_IMPORT_DESIGN: p10Raw,
+  P11_IMPORT_EDIT: p11Raw,
 };
 
 export const PIPELINE_PROMPT_NAMES = Object.keys(TEMPLATES) as PipelinePromptName[];

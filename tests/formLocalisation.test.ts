@@ -57,3 +57,31 @@ describe('the creation form speaks the interface language', () => {
     expect(form).toContain('<option key={audience} value={audience}>');
   });
 });
+
+describe('the interface is translated everywhere, not only on the form', () => {
+  it('gives every English key a translation in every language', () => {
+    for (const lang of ['ru', 'uk']) {
+      const missing = Object.keys(dictionaries.en).filter(key => !dictionaries[lang][key]);
+      expect(missing, `${lang} is missing these keys`).toEqual([]);
+    }
+  });
+
+  it('carries the same interpolation holes into every translation', () => {
+    // A translation that drops {{count}} renders a sentence with a hole in the middle.
+    const holes = (text: string) => [...text.matchAll(/\{\{(\w+)\}\}/g)].map(match => match[1]).sort();
+    for (const lang of ['ru', 'uk']) {
+      const broken = Object.keys(dictionaries.en).filter(
+        key => dictionaries[lang][key] && holes(dictionaries.en[key]).join() !== holes(dictionaries[lang][key]).join(),
+      );
+      expect(broken, `${lang} changes the variables of these keys`).toEqual([]);
+    }
+  });
+
+  it('names the Word import in every language', () => {
+    for (const key of ['dashboard.importBook', 'import.title', 'import.stage.reading', 'import.unresolved']) {
+      for (const [lang, dictionary] of Object.entries(dictionaries)) {
+        expect(dictionary[key], `${lang} has no ${key}`).toBeTruthy();
+      }
+    }
+  });
+});

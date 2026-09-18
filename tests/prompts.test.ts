@@ -20,6 +20,9 @@ describe('Pipeline prompts on disk', () => {
       'P06_FORWARD_UPDATE',
       'P07_FINAL_AUDIT',
       'P08_SPAN_REPAIR',
+      'P09_IMPORT_READ',
+      'P10_IMPORT_DESIGN',
+      'P11_IMPORT_EDIT',
     ]);
   });
 
