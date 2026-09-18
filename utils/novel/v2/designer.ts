@@ -142,15 +142,30 @@ export function validateBookDesign(raw: unknown, chapterCount: number): BookDesi
   if (!Array.isArray(chapters) || chapters.length !== chapterCount) {
     throw new Error(`chapter_map holds ${Array.isArray(chapters) ? chapters.length : 'no'} entries for ${chapterCount} chapters.`);
   }
+  // An id is bookkeeping, not meaning: the entry's meaning is its text, and nothing about the
+  // book depends on whether the model remembered to emit "C02". A smaller local model forgets
+  // often, and losing a whole design over it costs the author the book rather than an id — so
+  // a missing or repeated one is filled in, in order, and the design goes on. This is the one
+  // place normalisation is safe here, because it invents no content: everything the entry says
+  // is still exactly what the model said. References that point at nothing are not silently
+  // patched — the design review's grounding charges still read them and report what is wrong.
   const ids = new Set<string>();
-  for (const list of [design.characters, design.world_rules, design.causal_map] as { id?: unknown }[][]) {
+  const prefixes = ['C', 'W', 'E'];
+  const lists = [design.characters, design.world_rules, design.causal_map] as { id?: unknown }[][];
+  lists.forEach((list, index) => {
     if (!Array.isArray(list)) throw new Error('Book design lists must be arrays.');
+    let next = 1;
+    const mint = () => {
+      let candidate = `${prefixes[index]}${String(next).padStart(2, '0')}`;
+      while (ids.has(candidate)) candidate = `${prefixes[index]}${String(++next).padStart(2, '0')}`;
+      next += 1;
+      return candidate;
+    };
     for (const entry of list) {
-      if (typeof entry?.id !== 'string' || !entry.id) throw new Error('Design entries need stable string ids.');
-      if (ids.has(entry.id)) throw new Error(`Duplicate design id: ${entry.id}.`);
-      ids.add(entry.id);
+      if (typeof entry?.id !== 'string' || !entry.id || ids.has(entry.id)) entry.id = mint();
+      ids.add(entry.id as string);
     }
-  }
+  });
   // Normalized, not defaulted: a chapter that declared no cost keeps an empty
   // cost and a null rung, which the budget check reads as a refusal and reports.
   // Filling them in would hide the one thing worth seeing.

@@ -10,8 +10,30 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { GeminiKeySlot } from '../studioTypes';
 import { recordUsage } from './usageTracker';
+import { logToTerminal } from '../utils/terminalLogger';
 
-const KEY_COOLDOWN_MS = 5 * 60 * 1000;
+/**
+ * How long a key sits out after a 429 when the API does not say. Gemini's free tier is limited
+ * per minute as well as per day, and a per-minute limit clears in about a minute — benching a
+ * good key for five would burn a pool of three within seconds and then stall the run for
+ * minutes, which reads exactly like rotation not working at all.
+ */
+const KEY_COOLDOWN_MS = 60_000;
+/** A key that keeps coming back rate-limited is out for longer each time, up to this. */
+const MAX_KEY_COOLDOWN_MS = 5 * 60 * 1000;
+
+/**
+ * Google says how long to wait, in the 429 body: "retryDelay": "24s". Honouring it beats any
+ * number this file could invent, and it is the difference between a key resting the 24 seconds
+ * it asked for and resting five minutes it did not.
+ */
+export function retryDelayFromError(error: unknown): number | null {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = /['"]?retryDelay['"]?\s*[:=]\s*['"]?(\d+(?:\.\d+)?)s/i.exec(message);
+  if (!match) return null;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : null;
+}
 
 // See vite.config.ts's '/api/gemini' proxy entry: a direct browser -> Google call can fail with
 // a bare "Failed to fetch" on some networks/browsers even with a valid key (corporate firewalls,
@@ -84,7 +106,11 @@ export function getActiveKeyLabel(): string {
 }
 
 function setActive(id: string) {
-  cache = { ...cache, activeKeyId: id };
+  cache = {
+    ...cache,
+    activeKeyId: id,
+    keys: cache.keys.map((slot) => (slot.id === id && slot.lastCooldownMs ? { ...slot, lastCooldownMs: undefined } : slot)),
+  };
   persist();
 }
 
@@ -93,8 +119,22 @@ function usableSlots(): GeminiKeySlot[] {
   return cache.keys.filter((s) => !s.disabledUntil || s.disabledUntil < now);
 }
 
-function disableSlot(id: string) {
-  cache = { ...cache, keys: cache.keys.map((s) => (s.id === id ? { ...s, disabledUntil: Date.now() + KEY_COOLDOWN_MS } : s)) };
+/**
+ * Bench a key. `askedMs` is what the API itself asked for, when it said; otherwise the wait
+ * doubles each consecutive time this key comes back rate-limited, so a key that is genuinely
+ * out of daily quota stops being retried every minute without ever being written off.
+ */
+function disableSlot(id: string, askedMs: number | null) {
+  const now = Date.now();
+  cache = {
+    ...cache,
+    keys: cache.keys.map((slot) => {
+      if (slot.id !== id) return slot;
+      const previous = slot.lastCooldownMs ?? 0;
+      const cooldown = askedMs ?? Math.min(MAX_KEY_COOLDOWN_MS, previous ? previous * 2 : KEY_COOLDOWN_MS);
+      return { ...slot, disabledUntil: now + cooldown, lastCooldownMs: cooldown };
+    }),
+  };
   persist();
 }
 
@@ -142,9 +182,12 @@ function rotationOrder(): GeminiKeySlot[] {
   } else {
     pool = [...cache.keys].sort((a, b) => (a.disabledUntil ?? 0) - (b.disabledUntil ?? 0));
   }
+  // The key that last worked is tried first; the rest keep their order. Expressed as a
+  // partition rather than a comparator, because "put this one first" is not a total order and
+  // a sort given one may reorder everything else as it pleases.
   const activeKeyId = cache.activeKeyId;
-  if (!activeKeyId) return pool;
-  return [...pool].sort((a, b) => (a.id === activeKeyId ? -1 : b.id === activeKeyId ? 1 : 0));
+  const active = pool.filter((slot) => slot.id === activeKeyId);
+  return [...active, ...pool.filter((slot) => slot.id !== activeKeyId)];
 }
 
 function isRateLimit(error: unknown): boolean {
@@ -225,11 +268,22 @@ export async function withApiKeyRotation<T>(call: (apiKey: string) => Promise<T>
         lastError = error;
         if (isRateLimit(error)) {
           anyRateLimited = true;
-          disableSlot(slot.id);
+          const asked = retryDelayFromError(error);
+          disableSlot(slot.id, asked);
+          // Say which key was set aside, for how long, and who is next: a run that looks like
+          // it stopped rotating is usually a pool that emptied faster than anyone could see.
+          const remaining = ordered.length - ordered.indexOf(slot) - 1;
+          logToTerminal(
+            `Key "${slot.label}" is rate-limited; resting ${Math.round((asked ?? KEY_COOLDOWN_MS) / 1000)}s. ` +
+            (remaining ? `Trying the next of ${remaining} remaining.` : 'No keys left in quota — waiting for the soonest to recover.'),
+            'Keys',
+            remaining ? 'warn' : 'error',
+          );
           continue;
         }
         if (isForbidden(error)) {
-          disableSlot(slot.id);
+          disableSlot(slot.id, null);
+          logToTerminal(`Key "${slot.label}" was refused (forbidden or invalid); skipping it.`, 'Keys', 'warn');
           continue;
         }
         throw error; // not a key-pool problem — surface it immediately

@@ -76,11 +76,21 @@ describe('v2 designer', () => {
     expect(premiseNameGaps(design(), 'A lighthouse keeper finds a door in the sea.')).toEqual([]);
   });
 
-  it('rejects a design with the wrong chapter count or duplicate ids', () => {
+  it('rejects a design with the wrong chapter count', () => {
     expect(() => validateBookDesign(design(3), 2)).toThrow(/chapter_map holds 3 entries for 2 chapters/);
+  });
+
+  it('mints ids a smaller model forgot instead of losing the whole design', () => {
+    // An id is bookkeeping: a local model that repeats or omits one should cost
+    // an id, not the book. The entry's own text must survive untouched.
     const dup = design();
-    dup.world_rules = [{ id: 'C01', rule: 'r', relevant_consequences: [] }];
-    expect(() => validateBookDesign(dup, 2)).toThrow(/Duplicate design id/);
+    dup.world_rules = [{ id: 'C01', rule: 'the tide only turns at dusk', relevant_consequences: [] }];
+    delete (dup.causal_map[0] as { id?: string }).id;
+    const fixed = validateBookDesign(dup, 2);
+    const ids = [...fixed.characters, ...fixed.world_rules, ...fixed.causal_map].map(entry => entry.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.every(id => typeof id === 'string' && id.length > 0)).toBe(true);
+    expect(fixed.world_rules[0].rule).toBe('the tide only turns at dusk');
   });
 });
 

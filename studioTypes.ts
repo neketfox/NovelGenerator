@@ -116,6 +116,8 @@ export interface GeminiKeySlot {
   label: string;
   key: string;
   disabledUntil?: number;
+  /** The last cooldown this key served, so a repeat offender rests longer than a first one. */
+  lastCooldownMs?: number;
 }
 
 export interface UsageSample {

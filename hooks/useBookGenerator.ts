@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { type StorySettings, type AgentLogEntry, GenerationStep, type ChapterData } from '../types';
 import { generateText, getStoredProviderConfig, getStoredValidatorConfig } from '../services/llmService';
-import type { NovelLLM } from '../utils/novel/v2/llm';
+import { setStructuredAttempts, type NovelLLM } from '../utils/novel/v2/llm';
 import { budgetFor, Orchestrator, type ProgressStage } from '../utils/novel/v2/orchestrator';
 import { ChapterPipelineV2 } from '../utils/novel/v2/pipeline';
 import { downloadJson, restoreSnapshot, snapshotProject } from '../utils/novel/v2/export';
@@ -174,6 +174,13 @@ export default function useBookGenerator(projectId?: string, onProjectCreated?: 
     setFinalMetadataJson(null);
     setGeneratedChapters([]);
     setCurrentChapterProcessing(0);
+    // A local model is given more chances to answer its own rejected answer: it drops a
+    // required key far more often than a hosted one, and locally the retries cost only time.
+    const writerProvider = getStoredProviderConfig();
+    const editorProvider = getStoredValidatorConfig();
+    const usingOllama = writerProvider.provider === 'ollama' || editorProvider?.provider === 'ollama';
+    setStructuredAttempts(usingOllama ? 5 : 2);
+
     // The same slot continues: finished chapters are skipped, partial ones restart.
     const store = getStore();
     const llm: NovelLLM = async (prompt, system, options = {}) => {

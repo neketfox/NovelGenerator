@@ -30,14 +30,14 @@ const AgentActivityLog: React.FC<AgentActivityLogProps> = ({ logs }) => {
   const formatTime = (timestamp: number) =>
     new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  const logsByChapter = logs.reduce((acc, log) => {
-    (acc[log.chapterNumber] ||= []).push(log);
-    return acc;
-  }, {} as Record<number, AgentLogEntry[]>);
+  const logsByChapter: Record<number, AgentLogEntry[]> = {};
+  for (const log of logs as AgentLogEntry[]) {
+    (logsByChapter[log.chapterNumber] ||= []).push(log);
+  }
 
   return (
     <div className="mt-2">
-      {Object.entries(logsByChapter).map(([chapterNum, chapterLogs]) => (
+      {Object.entries(logsByChapter).map(([chapterNum, chapterLogs]: [string, AgentLogEntry[]]) => (
         <div key={chapterNum} className="mb-4">
           <h4 className="text-xs font-semibold uppercase text-zinc-500 mb-1.5">
             Chapter {chapterNum}

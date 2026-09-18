@@ -66,6 +66,25 @@ export interface RetryNotice {
 const retryNotices: RetryNotice[] = [];
 
 /** First-attempt failures, drained by the caller into the run log. No signature changes needed. */
+/**
+ * How many times a structured call may answer its own rejected answer.
+ *
+ * Two is right for a large hosted model: a third attempt on the same prompt under the same cap
+ * mostly repeats the second. A small local model is a different case — it drops a required key
+ * or emits half an object often enough that two attempts lose whole books, and its tokens cost
+ * nothing but time. The app raises this when the configured provider is Ollama; nothing else
+ * changes about what is accepted, because every attempt is still validated the same way.
+ */
+let structuredAttempts = 2;
+
+export function setStructuredAttempts(attempts: number): void {
+  structuredAttempts = Math.max(1, Math.min(6, Math.round(attempts)));
+}
+
+export function getStructuredAttempts(): number {
+  return structuredAttempts;
+}
+
 export function drainRetryNotices(): RetryNotice[] {
   return retryNotices.splice(0, retryNotices.length);
 }
@@ -82,7 +101,7 @@ export async function structuredResponse<T>(prompt: string, system: string, llm:
   // cap, so it fails identically while doubling the wait — and the real reason then arrives wrapped in
   // "remained unvalidated after two attempts", which reads like a model problem.
   const unanswerable = /exceeded your API quota|quota exceeded|API key not valid|SERVICE_DISABLED|API_KEY_SERVICE_BLOCKED|requests per day|has not been used in project|token limit|cut off before its JSON|output token budget|not found, try pulling it|model .* not found|ECONNREFUSED|Failed to fetch/i;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < structuredAttempts; attempt++) {
     try {
       const schema = options.schema || { type: 'object', required: keys, properties: Object.fromEntries(keys.map(key => [key, {}])), additionalProperties: true };
       const retryTemperature = sameness.test(failure) ? Math.max(options.temperature ?? 0.2, 0.9) : 0.1;

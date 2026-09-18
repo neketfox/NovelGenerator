@@ -110,3 +110,75 @@ describe('Gemini key rotation', () => {
     expect(getRateLimitStatus().resumeAt).toBeNull();
   });
 });
+
+describe('cooldowns bench one key, not the pool', () => {
+  it('reads the rest Google itself asked for', async () => {
+    const { retryDelayFromError } = await loadPool([]);
+    expect(retryDelayFromError(new Error('{"retryDelay":"127s"}'))).toBe(127_000);
+    expect(retryDelayFromError(new Error("retryDelay: '3.5s'"))).toBe(3_500);
+    expect(retryDelayFromError(new Error('plain quota message'))).toBeNull();
+  });
+
+  it('keeps the fresh keys usable while one rests out its 127 seconds', async () => {
+    // The complaint this answers: one key cooled down for 127s and the run stalled
+    // although two untouched keys were sitting right behind it.
+    const { withApiKeyRotation, getKeyStatuses } = await loadPool([
+      { id: 'a', label: 'A', key: 'key-a' },
+      { id: 'b', label: 'B', key: 'key-b' },
+      { id: 'c', label: 'C', key: 'key-c' },
+    ]);
+    const call = vi.fn(async (apiKey: string) => {
+      if (apiKey === 'key-a') throw new Error('[429] RESOURCE_EXHAUSTED {"retryDelay":"127s"}');
+      return `ok:${apiKey}`;
+    });
+    expect(await withApiKeyRotation(call)).toBe('ok:key-b');
+
+    const statuses = Object.fromEntries(getKeyStatuses().map(s => [s.id, s]));
+    expect(statuses.a.cooldownRemainingMs).toBeGreaterThan(120_000);
+    expect(statuses.a.cooldownRemainingMs).toBeLessThanOrEqual(127_000);
+    expect(statuses.b.cooldownRemainingMs).toBe(0);
+    expect(statuses.c.cooldownRemainingMs).toBe(0);
+    expect(statuses.b.isActive).toBe(true);
+  });
+
+  it('tries the key that last worked first, and leaves the others in their order', async () => {
+    const { withApiKeyRotation } = await loadPool([
+      { id: 'a', label: 'A', key: 'key-a' },
+      { id: 'b', label: 'B', key: 'key-b' },
+      { id: 'c', label: 'C', key: 'key-c' },
+    ]);
+    // First pass: a is spent, b answers and becomes the active key.
+    await withApiKeyRotation(async (apiKey) => {
+      if (apiKey === 'key-a') throw rateLimit();
+      return apiKey;
+    });
+    const tried: string[] = [];
+    await withApiKeyRotation(async (apiKey) => { tried.push(apiKey); return apiKey; });
+    expect(tried).toEqual(['key-b']);
+  });
+
+  it('rests a repeat offender longer, without ever writing the key off', async () => {
+    const { withApiKeyRotation, getKeyStatuses } = await loadPool([
+      { id: 'a', label: 'A', key: 'key-a' },
+      { id: 'b', label: 'B', key: 'key-b' },
+      { id: 'c', label: 'C', key: 'key-c' },
+    ]);
+    // no retryDelay in these errors: the pool decides the wait itself
+    await withApiKeyRotation(async (apiKey) => {
+      if (apiKey === 'key-a') throw rateLimit();
+      return apiKey;
+    });
+    expect(getKeyStatuses().find(s => s.id === 'a')!.lastCooldownMs).toBe(60_000);
+
+    // Once the first cooldown lapses the key rejoins the pool — and a second refusal
+    // doubles the wait instead of asking again every minute forever.
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 61_000);
+    await withApiKeyRotation(async (apiKey) => {
+      if (apiKey === 'key-c') return apiKey;
+      throw rateLimit();
+    });
+    expect(getKeyStatuses().find(s => s.id === 'a')!.lastCooldownMs).toBe(120_000);
+    vi.useRealTimers();
+  });
+});
